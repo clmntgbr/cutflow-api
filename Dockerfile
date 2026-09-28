@@ -5,7 +5,7 @@ FROM golang:1.25-alpine AS base
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git ffmpeg
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -25,6 +25,7 @@ ENV PATH="/go/bin:${PATH}"
 EXPOSE 3000
 
 CMD ["air", "-c", ".air.toml"]
+
 
 
 # ============================================
@@ -56,7 +57,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # ============================================
 FROM alpine:latest AS production
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata ffmpeg
+
 
 RUN addgroup -g 1000 appuser && \
     adduser -D -u 1000 -G appuser appuser

@@ -14,10 +14,13 @@ import (
 func Models() []any {
 	return []any{
 		&write.UserModel{},
+		&write.ProjectModel{},
+		&write.MediaFileModel{},
 		&outbox.OutboxEvent{},
 		&processed.ProcessedEvent{},
 	}
 }
+
 
 // AssertModelsMatchDB fails when model columns and DB columns diverge.
 func AssertModelsMatchDB(db *gorm.DB) error {

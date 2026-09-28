@@ -16,6 +16,11 @@ func setupRoutes(app *fiber.App, container *di.Container) {
 func setupWebhooks(app *fiber.App, container *di.Container) {
 	webhooks := app.Group("/webhooks")
 	webhooks.Post("/clerk", container.UserWebhookMiddleware.Protected(), container.UserWebhookHandler.Execute)
+	webhooks.Post(
+		"/minio/object-created",
+		container.StorageWebhookMiddleware.Protected(),
+		container.StorageWebhookHandler.ObjectCreated,
+	)
 }
 
 func setupHealthChecks(app *fiber.App) {
@@ -29,6 +34,7 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 
 	protected := public.Group("", container.AuthenticateMiddleware.Protected())
 	setupUserRoutes(protected, container)
+	setupProjectRoutes(protected, container)
 	setupRealtimeRoutes(protected, container)
 }
 
@@ -38,4 +44,8 @@ func setupRealtimeRoutes(api fiber.Router, container *di.Container) {
 
 func setupUserRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/users/me", container.UserHandler.GetUser)
+}
+
+func setupProjectRoutes(api fiber.Router, container *di.Container) {
+	api.Post("/projects/upload-url", container.ProjectHandler.RequestUploadURL)
 }

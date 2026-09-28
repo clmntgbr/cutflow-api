@@ -121,6 +121,42 @@ services:
     networks:
       - api
     restart: unless-stopped
+  
+  minio:
+    container_name: s3
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: devuser
+      MINIO_ROOT_PASSWORD: devpassword
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - api
+    restart: unless-stopped
+
+  mc:
+    container_name: mc
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set myminio http://minio:9000 devuser devpassword; do sleep 1; done;
+      mc mb myminio/${STORAGE_BUCKET:-media} --ignore-existing;
+      mc mb myminio/${STORAGE_THUMBNAIL_BUCKET:-thumbnails} --ignore-existing;
+      mc admin config set myminio notify_webhook:analyze endpoint='http://api:3000/webhooks/minio/object-created' auth_token='${MINIO_WEBHOOK_SECRET:-dev-minio-webhook-secret}';
+      mc admin service restart myminio --json;
+      sleep 5;
+      mc event remove myminio/${STORAGE_BUCKET:-media} --force || true;
+      mc event add myminio/${STORAGE_BUCKET:-media} arn:minio:sqs::analyze:webhook --event put --prefix videos/ --suffix original.mp4 -p;
+      "
+    networks:
+      - api
 
   ngrok:
     container_name: ngrok
@@ -146,6 +182,7 @@ services:
 
 volumes:
   go-modules:
+  minio_data:
   go-build-cache:
   database_data:
 
