@@ -47,5 +47,7 @@ func setupUserRoutes(api fiber.Router, container *di.Container) {
 }
 
 func setupProjectRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/projects", container.ProjectHandler.List)
+	api.Get("/projects/:id", container.ProjectHandler.GetByID)
 	api.Post("/projects/upload-url", container.ProjectHandler.RequestUploadURL)
 }

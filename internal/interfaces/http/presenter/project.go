@@ -4,6 +4,7 @@ import (
 	"time"
 
 	cmdproject "go-api/internal/application/command/project"
+	domainproject "go-api/internal/domain/project"
 )
 
 type RequestUploadURLResponse struct {
@@ -19,5 +20,72 @@ func NewRequestUploadURLResponse(result *cmdproject.RequestUploadURLResult) Requ
 		MediaFileID: result.MediaFileID,
 		UploadURL:   result.UploadURL,
 		ExpiresAt:   result.ExpiresAt,
+	}
+}
+
+// ProjectListItemResponse is intentionally lean for short list calls.
+type ProjectListItemResponse struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+func NewProjectListResponseFromViews(views []domainproject.ProjectListView) []ProjectListItemResponse {
+	out := make([]ProjectListItemResponse, 0, len(views))
+	for _, view := range views {
+		out = append(out, ProjectListItemResponse{
+			ID:        view.ID.String(),
+			Name:      view.Name,
+			Status:    view.Status,
+			CreatedAt: view.CreatedAt,
+		})
+	}
+	return out
+}
+
+type ProjectDetailResponse struct {
+	ID         string                        `json:"id"`
+	Name       string                        `json:"name"`
+	Status     string                        `json:"status"`
+	CreatedAt  time.Time                     `json:"createdAt"`
+	UpdatedAt  time.Time                     `json:"updatedAt"`
+	MediaFiles []ProjectMediaFileResponse    `json:"mediaFiles"`
+}
+
+type ProjectMediaFileResponse struct {
+	ID               string    `json:"id"`
+	OriginalFilename *string   `json:"originalFilename"`
+	MimeType         *string   `json:"mimeType"`
+	SizeBytes        int64     `json:"sizeBytes"`
+	DurationMs       int64     `json:"durationMs"`
+	OriginalURL      *string   `json:"originalUrl"`
+	ThumbnailURL     *string   `json:"thumbnailUrl"`
+	Status           string    `json:"status"`
+	CreatedAt        time.Time `json:"createdAt"`
+}
+
+func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) ProjectDetailResponse {
+	mediaFiles := make([]ProjectMediaFileResponse, 0, len(view.MediaFiles))
+	for _, media := range view.MediaFiles {
+		mediaFiles = append(mediaFiles, ProjectMediaFileResponse{
+			ID:               media.ID.String(),
+			OriginalFilename: optionalNonEmptyString(media.OriginalFilename),
+			MimeType:         optionalNonEmptyString(media.MimeType),
+			SizeBytes:        media.SizeBytes,
+			DurationMs:       media.DurationMs,
+			OriginalURL:      optionalNonEmptyString(media.OriginalURL),
+			ThumbnailURL:     optionalNonEmptyString(media.ThumbnailURL),
+			Status:           media.Status,
+			CreatedAt:        media.CreatedAt,
+		})
+	}
+	return ProjectDetailResponse{
+		ID:         view.ID.String(),
+		Name:       view.Name,
+		Status:     view.Status,
+		CreatedAt:  view.CreatedAt,
+		UpdatedAt:  view.UpdatedAt,
+		MediaFiles: mediaFiles,
 	}
 }

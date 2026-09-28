@@ -11,7 +11,7 @@ import (
 
 func TestProjectHandler_RequestUploadURL_Success(t *testing.T) {
 	upload := &mockRequestUploadURLHandler{result: sampleUploadResult()}
-	h := newProjectHandler(upload)
+	h := newProjectHandler(upload, nil, nil)
 
 	app := testutil.NewTestApp()
 	app.Post("/projects/upload-url", testutil.WithUserWithoutProject(testutil.TestUserID), h.RequestUploadURL)
@@ -53,7 +53,7 @@ func TestProjectHandler_RequestUploadURL_Success(t *testing.T) {
 
 func TestProjectHandler_RequestUploadURL_Unauthorized(t *testing.T) {
 	upload := &mockRequestUploadURLHandler{}
-	h := newProjectHandler(upload)
+	h := newProjectHandler(upload, nil, nil)
 
 	app := testutil.NewTestApp()
 	app.Post("/projects/upload-url", h.RequestUploadURL)
@@ -76,7 +76,7 @@ func TestProjectHandler_RequestUploadURL_Unauthorized(t *testing.T) {
 }
 
 func TestProjectHandler_RequestUploadURL_InvalidInput(t *testing.T) {
-	h := newProjectHandler(nil)
+	h := newProjectHandler(nil, nil, nil)
 
 	app := testutil.NewTestApp()
 	app.Post("/projects/upload-url", testutil.WithUserWithoutProject(testutil.TestUserID), h.RequestUploadURL)
@@ -97,7 +97,7 @@ func TestProjectHandler_RequestUploadURL_InvalidInput(t *testing.T) {
 
 func TestProjectHandler_RequestUploadURL_HandlerError_UnsupportedType(t *testing.T) {
 	upload := &mockRequestUploadURLHandler{err: domainmediafile.ErrUnsupportedType}
-	h := newProjectHandler(upload)
+	h := newProjectHandler(upload, nil, nil)
 
 	app := testutil.NewTestApp()
 	app.Post("/projects/upload-url", testutil.WithUserWithoutProject(testutil.TestUserID), h.RequestUploadURL)
@@ -123,7 +123,7 @@ func TestProjectHandler_RequestUploadURL_HandlerError_UnsupportedType(t *testing
 
 func TestProjectHandler_RequestUploadURL_HandlerError_InvalidFilename(t *testing.T) {
 	upload := &mockRequestUploadURLHandler{err: domainmediafile.ErrInvalidFilename}
-	h := newProjectHandler(upload)
+	h := newProjectHandler(upload, nil, nil)
 
 	app := testutil.NewTestApp()
 	app.Post("/projects/upload-url", testutil.WithUserWithoutProject(testutil.TestUserID), h.RequestUploadURL)
@@ -144,7 +144,7 @@ func TestProjectHandler_RequestUploadURL_HandlerError_InvalidFilename(t *testing
 
 func TestProjectHandler_RequestUploadURL_HandlerError_TooLarge(t *testing.T) {
 	upload := &mockRequestUploadURLHandler{err: domainmediafile.ErrMediaTooLarge}
-	h := newProjectHandler(upload)
+	h := newProjectHandler(upload, nil, nil)
 
 	app := testutil.NewTestApp()
 	app.Post("/projects/upload-url", testutil.WithUserWithoutProject(testutil.TestUserID), h.RequestUploadURL)
@@ -170,7 +170,7 @@ func TestProjectHandler_RequestUploadURL_HandlerError_TooLarge(t *testing.T) {
 
 func TestProjectHandler_RequestUploadURL_HandlerError_Internal(t *testing.T) {
 	upload := &mockRequestUploadURLHandler{err: errUnexpected}
-	h := newProjectHandler(upload)
+	h := newProjectHandler(upload, nil, nil)
 
 	app := testutil.NewTestApp()
 	app.Post("/projects/upload-url", testutil.WithUserWithoutProject(testutil.TestUserID), h.RequestUploadURL)

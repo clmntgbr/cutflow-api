@@ -8,6 +8,7 @@ import (
 	cmdmediafile "go-api/internal/application/command/mediafile"
 	cmdproject "go-api/internal/application/command/project"
 	usercmd "go-api/internal/application/command/user"
+	queryproject "go-api/internal/application/query/project"
 	queryuser "go-api/internal/application/query/user"
 	"go-api/internal/infrastructure/centrifugo"
 	infraClerk "go-api/internal/infrastructure/clerk"
@@ -47,6 +48,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	userWriteRepo := write.NewUserWriteRepository(db)
 	userReadRepo := read.NewUserReadRepository(db)
 	projectWriteRepo := write.NewProjectWriteRepository(db)
+	projectReadRepo := read.NewProjectReadRepository(db)
 	mediaFileWriteRepo := write.NewMediaFileWriteRepository(db)
 	outboxRepo := outbox.NewRepository(db)
 
@@ -72,6 +74,8 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		outboxRepo,
 		env.MediaMaxSizeBytes,
 	)
+	listProjectsHandler := queryproject.NewListProjectsHandler(projectReadRepo)
+	getProjectByIDHandler := queryproject.NewGetProjectByIDHandler(projectReadRepo, minioStorage)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -89,7 +93,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		),
 		StorageWebhookHandler: httphandler.NewStorageWebhookHandler(env.StorageBucket, confirmUploadHandler),
 		UserHandler:           httphandler.NewUserHandler(getUserByIDHandler),
-		ProjectHandler:        httphandler.NewProjectHandler(requestUploadURLHandler),
+		ProjectHandler: httphandler.NewProjectHandler(
+			requestUploadURLHandler,
+			listProjectsHandler,
+			getProjectByIDHandler,
+		),
 		RealtimeHandler:       httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
 	}
 }
