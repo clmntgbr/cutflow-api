@@ -74,3 +74,27 @@ func (p *Project) PullEvents() []event.DomainEvent {
 func (p *Project) recordEvent(e event.DomainEvent) {
 	p.events = append(p.events, e)
 }
+
+// MarkProcessing moves a draft project into processing when its first media is uploaded.
+// Already-processing (and later) statuses are no-ops so webhook retries stay idempotent.
+func (p *Project) MarkProcessing() error {
+	switch p.Status {
+	case StatusDraft:
+		now := time.Now().UTC()
+		p.Status = StatusProcessing
+		p.UpdatedAt = now
+		p.recordEvent(ProjectUpdated{
+			ID:        uuid.New().String(),
+			ProjectID: p.ID.String(),
+			UserID:    p.UserID.String(),
+			Name:      p.Name,
+			Status:    p.Status,
+			Timestamp: now,
+		})
+		return nil
+	case StatusProcessing, StatusReady, StatusRendering, StatusCompleted, StatusFailed:
+		return nil
+	default:
+		return ErrInvalidTransition
+	}
+}

@@ -6,10 +6,12 @@ import (
 
 	"go-api/internal/application/event/dedup"
 	eventmediafile "go-api/internal/application/event/mediafile"
+	eventproject "go-api/internal/application/event/project"
 	eventuser "go-api/internal/application/event/user"
 	cmdmediafile "go-api/internal/application/command/mediafile"
 	"go-api/internal/application/registry"
 	domainmediafile "go-api/internal/domain/mediafile"
+	domainproject "go-api/internal/domain/project"
 	domainuser "go-api/internal/domain/user"
 	"go-api/internal/infrastructure/centrifugo"
 	"go-api/internal/infrastructure/config"
@@ -60,6 +62,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	realtimePublisher := centrifugo.NewPublisher(env)
 	publishUserRealtime := eventuser.NewPublishRealtimeHandler(realtimePublisher)
 	publishMediaRealtime := eventmediafile.NewPublishRealtimeHandler(realtimePublisher)
+	publishProjectRealtime := eventproject.NewPublishRealtimeHandler(realtimePublisher)
 
 	generateThumbnailHandler := cmdmediafile.NewGenerateThumbnailHandler(
 		mediaFileWriteRepo,
@@ -115,6 +118,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo,
 		"publish_media_file_uploaded_realtime",
 		publishMediaRealtime.OnUploaded,
+	))
+	reg.Register(domainproject.EventTypeProjectUpdated, dedup.With(
+		dedupRepo,
+		"publish_project_updated_realtime",
+		publishProjectRealtime.OnUpdated,
 	))
 
 	consumer := rabbitmq.NewConsumer(conn, reg, env.WorkerConcurrency, env.WorkerMaxRetries)

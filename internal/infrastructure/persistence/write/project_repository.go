@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type projectWriteRepository struct {
@@ -33,8 +34,13 @@ func (r *projectWriteRepository) Update(ctx context.Context, project *domainproj
 }
 
 func (r *projectWriteRepository) GetByID(ctx context.Context, id uuid.UUID) (*domainproject.Project, error) {
+	db := DBWithContext(ctx, r.db)
+	if _, ok := ctx.Value(txCtxKey{}).(*gorm.DB); ok {
+		db = db.Clauses(clause.Locking{Strength: "UPDATE"})
+	}
+
 	var model ProjectModel
-	err := DBWithContext(ctx, r.db).First(&model, "id = ?", id).Error
+	err := db.First(&model, "id = ?", id).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil

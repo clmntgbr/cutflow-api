@@ -8,6 +8,7 @@ const (
 
 	EntityUser      = "user"
 	EntityMediaFile = "media_file"
+	EntityProject   = "project"
 )
 
 

@@ -7,6 +7,7 @@ import (
 
 	cmdmediafile "go-api/internal/application/command/mediafile"
 	domainmediafile "go-api/internal/domain/mediafile"
+	domainproject "go-api/internal/domain/project"
 	"go-api/internal/interfaces/http/dto"
 	"go-api/internal/interfaces/http/validation"
 
@@ -43,7 +44,9 @@ func (h *StorageWebhookHandler) ObjectCreated(c fiber.Ctx) error {
 		if err := h.processRecord(c, record); err != nil {
 			if errors.Is(err, domainmediafile.ErrMediaNotFound) ||
 				errors.Is(err, domainmediafile.ErrInvalidTransition) ||
-				errors.Is(err, domainmediafile.ErrMediaTooLarge) {
+				errors.Is(err, domainmediafile.ErrMediaTooLarge) ||
+				errors.Is(err, domainproject.ErrProjectNotFound) ||
+				errors.Is(err, domainproject.ErrInvalidTransition) {
 				continue
 			}
 			log.Printf("storage webhook: failed to confirm upload: %v", err)

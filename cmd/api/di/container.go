@@ -68,6 +68,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	)
 	confirmUploadHandler := cmdmediafile.NewConfirmUploadHandler(
 		mediaFileWriteRepo,
+		projectWriteRepo,
 		outboxRepo,
 		env.MediaMaxSizeBytes,
 	)

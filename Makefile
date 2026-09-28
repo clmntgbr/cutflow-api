@@ -8,8 +8,7 @@ dev:
 	$(COMPOSE_DEV) up -d
 
 restart:
-	$(COMPOSE_DEV) down
-	$(COMPOSE_DEV) up -d
+	$(COMPOSE_DEV) restart worker api
 
 build:
 	$(COMPOSE_DEV) up -d --build
@@ -72,6 +71,9 @@ migrate-down: cli-build
 
 migrate-check: cli-build
 	@$(COMPOSE_DEV) exec api ./bin/cli migrate check
+
+purge: cli-build
+	@$(COMPOSE_DEV) exec api ./bin/cli purge --yes
 
 shell:
 	$(COMPOSE_DEV) exec api sh

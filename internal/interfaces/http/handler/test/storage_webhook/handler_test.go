@@ -8,6 +8,7 @@ import (
 
 	cmdmediafile "go-api/internal/application/command/mediafile"
 	domainmediafile "go-api/internal/domain/mediafile"
+	domainproject "go-api/internal/domain/project"
 	"go-api/internal/interfaces/http/dto"
 	"go-api/internal/interfaces/http/handler"
 	"go-api/internal/interfaces/http/testutil"
@@ -184,6 +185,16 @@ func TestStorageWebhookHandler_ObjectCreated_BrokenEncoding(t *testing.T) {
 
 func TestStorageWebhookHandler_ObjectCreated_HandlerError_NotFound(t *testing.T) {
 	confirm := &mockConfirmUploadHandler{err: domainmediafile.ErrMediaNotFound}
+	h := newHandler(confirm)
+
+	resp := postWebhook(t, h, objectCreated(domainmediafile.NewStorageKey(testutil.TestMediaFileID), testBucket))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d want %d", resp.StatusCode, http.StatusOK)
+	}
+}
+
+func TestStorageWebhookHandler_ObjectCreated_HandlerError_ProjectNotFound(t *testing.T) {
+	confirm := &mockConfirmUploadHandler{err: domainproject.ErrProjectNotFound}
 	h := newHandler(confirm)
 
 	resp := postWebhook(t, h, objectCreated(domainmediafile.NewStorageKey(testutil.TestMediaFileID), testBucket))

@@ -3,8 +3,10 @@ package mediafile
 import (
 	"context"
 
+	"go-api/internal/domain/event"
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
+	domainproject "go-api/internal/domain/project"
 )
 
 type ConfirmUploadCommand struct {
@@ -14,20 +16,23 @@ type ConfirmUploadCommand struct {
 }
 
 type ConfirmUploadHandler struct {
-	mediaRepo domainmediafile.MediaFileWriteRepository
-	outbox    port.OutboxRepository
-	maxSize   int64
+	mediaRepo   domainmediafile.MediaFileWriteRepository
+	projectRepo domainproject.ProjectWriteRepository
+	outbox      port.OutboxRepository
+	maxSize     int64
 }
 
 func NewConfirmUploadHandler(
 	mediaRepo domainmediafile.MediaFileWriteRepository,
+	projectRepo domainproject.ProjectWriteRepository,
 	outbox port.OutboxRepository,
 	maxSize int64,
 ) *ConfirmUploadHandler {
 	return &ConfirmUploadHandler{
-		mediaRepo: mediaRepo,
-		outbox:    outbox,
-		maxSize:   maxSize,
+		mediaRepo:   mediaRepo,
+		projectRepo: projectRepo,
+		outbox:      outbox,
+		maxSize:     maxSize,
 	}
 }
 
@@ -49,9 +54,26 @@ func (h *ConfirmUploadHandler) Handle(ctx context.Context, cmd ConfirmUploadComm
 			return err
 		}
 
+		project, err := h.projectRepo.GetByID(txCtx, media.ProjectID)
+		if err != nil {
+			return err
+		}
+		if project == nil {
+			return domainproject.ErrProjectNotFound
+		}
+		if err := project.MarkProcessing(); err != nil {
+			return err
+		}
+
 		if err := h.mediaRepo.Update(txCtx, media); err != nil {
 			return err
 		}
-		return h.outbox.StoreEvents(txCtx, media.PullEvents())
+		if err := h.projectRepo.Update(txCtx, project); err != nil {
+			return err
+		}
+
+		events := append([]event.DomainEvent{}, media.PullEvents()...)
+		events = append(events, project.PullEvents()...)
+		return h.outbox.StoreEvents(txCtx, events)
 	})
 }
