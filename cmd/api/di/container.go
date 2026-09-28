@@ -9,6 +9,7 @@ import (
 	cmdproject "go-api/internal/application/command/project"
 	usercmd "go-api/internal/application/command/user"
 	queryproject "go-api/internal/application/query/project"
+	querymediafile "go-api/internal/application/query/mediafile"
 	queryuser "go-api/internal/application/query/user"
 	"go-api/internal/infrastructure/centrifugo"
 	infraClerk "go-api/internal/infrastructure/clerk"
@@ -31,6 +32,7 @@ type Container struct {
 	StorageWebhookHandler    *httphandler.StorageWebhookHandler
 	UserHandler              *httphandler.UserHandler
 	ProjectHandler           *httphandler.ProjectHandler
+	MediaFileHandler         *httphandler.MediaFileHandler
 	RealtimeHandler          *httphandler.RealtimeHandler
 }
 
@@ -50,6 +52,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	projectWriteRepo := write.NewProjectWriteRepository(db)
 	projectReadRepo := read.NewProjectReadRepository(db)
 	mediaFileWriteRepo := write.NewMediaFileWriteRepository(db)
+	mediaFileReadRepo := read.NewMediaFileReadRepository(db)
 	outboxRepo := outbox.NewRepository(db)
 
 	createUserHandler := usercmd.NewCreateUserHandler(userWriteRepo, outboxRepo)
@@ -76,6 +79,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	)
 	listProjectsHandler := queryproject.NewListProjectsHandler(projectReadRepo)
 	getProjectByIDHandler := queryproject.NewGetProjectByIDHandler(projectReadRepo, minioStorage)
+	getOwnedMediaFileHandler := querymediafile.NewGetOwnedMediaFileHandler(mediaFileReadRepo)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -98,6 +102,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			listProjectsHandler,
 			getProjectByIDHandler,
 		),
-		RealtimeHandler:       httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
+		MediaFileHandler: httphandler.NewMediaFileHandler(getOwnedMediaFileHandler, minioStorage),
+		RealtimeHandler:  httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
 	}
 }

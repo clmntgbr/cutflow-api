@@ -16,3 +16,13 @@ type MediaFileWriteRepository interface {
 	UpdateThumbnailKey(ctx context.Context, id uuid.UUID, thumbnailKey string) error
 	ListExpiredPending(ctx context.Context, cutoff time.Time) ([]*MediaFile, error)
 }
+
+type MediaFileReadRepository interface {
+	FindOwnedByID(ctx context.Context, id, userID uuid.UUID) (*MediaFileThumbnailView, error)
+}
+
+// MediaFileThumbnailView carries the fields needed to stream a thumbnail.
+type MediaFileThumbnailView struct {
+	ID           uuid.UUID
+	ThumbnailKey string
+}

@@ -1,10 +1,11 @@
 package realtime
 
 const (
-	ActionCreated  = "created"
-	ActionUpdated  = "updated"
-	ActionDeleted  = "deleted"
-	ActionUploaded = "uploaded"
+	ActionCreated        = "created"
+	ActionUpdated        = "updated"
+	ActionDeleted        = "deleted"
+	ActionUploaded       = "uploaded"
+	ActionThumbnailReady = "thumbnail_ready"
 
 	EntityUser      = "user"
 	EntityMediaFile = "media_file"

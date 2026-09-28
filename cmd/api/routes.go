@@ -35,6 +35,7 @@ func setupAPIRoutes(app *fiber.App, container *di.Container) {
 	protected := public.Group("", container.AuthenticateMiddleware.Protected())
 	setupUserRoutes(protected, container)
 	setupProjectRoutes(protected, container)
+	setupMediaFileRoutes(protected, container)
 	setupRealtimeRoutes(protected, container)
 }
 
@@ -50,4 +51,8 @@ func setupProjectRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/projects", container.ProjectHandler.List)
 	api.Get("/projects/:id", container.ProjectHandler.GetByID)
 	api.Post("/projects/upload-url", container.ProjectHandler.RequestUploadURL)
+}
+
+func setupMediaFileRoutes(api fiber.Router, container *di.Container) {
+	api.Get("/media-files/:id/thumbnail", container.MediaFileHandler.GetThumbnail)
 }

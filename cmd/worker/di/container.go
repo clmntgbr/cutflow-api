@@ -68,6 +68,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		mediaFileWriteRepo,
 		minioStorage,
 		inframedia.NewFrameExtractor(),
+		outboxRepo,
 	)
 	onUploadedThumbnail := eventmediafile.NewGenerateThumbnailOnUploadedHandler(generateThumbnailHandler)
 
@@ -118,6 +119,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo,
 		"publish_media_file_uploaded_realtime",
 		publishMediaRealtime.OnUploaded,
+	))
+	reg.Register(domainmediafile.EventTypeMediaFileThumbnailReady, dedup.With(
+		dedupRepo,
+		"publish_media_file_thumbnail_ready_realtime",
+		publishMediaRealtime.OnThumbnailReady,
 	))
 	reg.Register(domainproject.EventTypeProjectUpdated, dedup.With(
 		dedupRepo,

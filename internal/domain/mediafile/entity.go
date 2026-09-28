@@ -134,6 +134,16 @@ func (m *MediaFile) SetThumbnailKey(key string) {
 	if key == "" || m.ThumbnailKey == key {
 		return
 	}
+	now := time.Now().UTC()
 	m.ThumbnailKey = key
-	m.UpdatedAt = time.Now().UTC()
+	m.UpdatedAt = now
+	m.recordEvent(MediaFileThumbnailReady{
+		ID:           uuid.New().String(),
+		MediaFileID:  m.ID.String(),
+		ProjectID:    m.ProjectID.String(),
+		UserID:       m.UserID.String(),
+		ThumbnailKey: key,
+		Status:       m.Status,
+		Timestamp:    now,
+	})
 }

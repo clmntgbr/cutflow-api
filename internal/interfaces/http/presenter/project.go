@@ -25,20 +25,22 @@ func NewRequestUploadURLResponse(result *cmdproject.RequestUploadURLResult) Requ
 
 // ProjectListItemResponse is intentionally lean for short list calls.
 type ProjectListItemResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"createdAt"`
+	ThumbnailURL *string   `json:"thumbnailUrl"`
 }
 
 func NewProjectListResponseFromViews(views []domainproject.ProjectListView) []ProjectListItemResponse {
 	out := make([]ProjectListItemResponse, 0, len(views))
 	for _, view := range views {
 		out = append(out, ProjectListItemResponse{
-			ID:        view.ID.String(),
-			Name:      view.Name,
-			Status:    view.Status,
-			CreatedAt: view.CreatedAt,
+			ID:           view.ID.String(),
+			Name:         view.Name,
+			Status:       view.Status,
+			CreatedAt:    view.CreatedAt,
+			ThumbnailURL: optionalNonEmptyString(mediaFileThumbnailURL(view.MediaFileID.String(), view.ThumbnailKey)),
 		})
 	}
 	return out
@@ -75,7 +77,7 @@ func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) Proj
 			SizeBytes:        media.SizeBytes,
 			DurationMs:       media.DurationMs,
 			OriginalURL:      optionalNonEmptyString(media.OriginalURL),
-			ThumbnailURL:     optionalNonEmptyString(media.ThumbnailURL),
+			ThumbnailURL:     optionalNonEmptyString(mediaFileThumbnailURL(media.ID.String(), media.ThumbnailKey)),
 			Status:           media.Status,
 			CreatedAt:        media.CreatedAt,
 		})
@@ -88,4 +90,11 @@ func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) Proj
 		UpdatedAt:  view.UpdatedAt,
 		MediaFiles: mediaFiles,
 	}
+}
+
+func mediaFileThumbnailURL(mediaFileID, thumbnailKey string) string {
+	if thumbnailKey == "" {
+		return ""
+	}
+	return "/api/media-files/" + mediaFileID + "/thumbnail"
 }

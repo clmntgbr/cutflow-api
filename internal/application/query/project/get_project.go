@@ -46,7 +46,6 @@ func (h *GetProjectByIDHandler) Handle(
 	for i := range view.MediaFiles {
 		media := &view.MediaFiles[i]
 		media.OriginalURL = presignMediaURL(ctx, h.storage, media.ID, media.StorageKey)
-		media.ThumbnailURL = presignMediaURL(ctx, h.storage, media.ID, media.ThumbnailKey)
 	}
 	return view, nil
 }

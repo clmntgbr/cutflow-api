@@ -100,10 +100,12 @@ func sampleUploadResult() *cmdproject.RequestUploadURLResult {
 func sampleProjectListViews() []domainproject.ProjectListView {
 	return []domainproject.ProjectListView{
 		{
-			ID:        testutil.TestProjectID,
-			Name:      "Demo",
-			Status:    domainproject.StatusProcessing,
-			CreatedAt: time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC),
+			ID:           testutil.TestProjectID,
+			Name:         "Demo",
+			Status:       domainproject.StatusProcessing,
+			CreatedAt:    time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC),
+			MediaFileID:  testutil.TestMediaFileID,
+			ThumbnailKey: "videos/" + testutil.TestMediaFileID.String() + "/thumbnail.jpg",
 		},
 	}
 }
@@ -123,7 +125,7 @@ func sampleProjectDetailView() *domainproject.ProjectDetailView {
 				SizeBytes:        1024,
 				DurationMs:       5000,
 				OriginalURL:      "https://cdn.example/original.mp4",
-				ThumbnailURL:     "https://cdn.example/thumb.jpg",
+				ThumbnailKey:     "videos/" + testutil.TestMediaFileID.String() + "/thumbnail.jpg",
 				Status:           "uploaded",
 				CreatedAt:        time.Date(2026, 9, 28, 10, 5, 0, 0, time.UTC),
 			},

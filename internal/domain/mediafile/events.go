@@ -3,9 +3,10 @@ package mediafile
 import "time"
 
 const (
-	EventTypeMediaFileCreated       = "media_file.created.v1"
-	EventTypeMediaFileUploaded      = "media_file.uploaded.v1"
-	EventTypeMediaFileUploadExpired = "media_file.upload_expired.v1"
+	EventTypeMediaFileCreated        = "media_file.created.v1"
+	EventTypeMediaFileUploaded       = "media_file.uploaded.v1"
+	EventTypeMediaFileUploadExpired  = "media_file.upload_expired.v1"
+	EventTypeMediaFileThumbnailReady = "media_file.thumbnail_ready.v1"
 )
 
 type MediaFileCreated struct {
@@ -53,3 +54,18 @@ func (e MediaFileUploadExpired) EventID() string       { return e.ID }
 func (e MediaFileUploadExpired) EventType() string     { return EventTypeMediaFileUploadExpired }
 func (e MediaFileUploadExpired) AggregateID() string   { return e.MediaFileID }
 func (e MediaFileUploadExpired) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaFileThumbnailReady struct {
+	ID           string    `json:"eventId"`
+	MediaFileID  string    `json:"mediaFileId"`
+	ProjectID    string    `json:"projectId"`
+	UserID       string    `json:"userId"`
+	ThumbnailKey string    `json:"thumbnailKey"`
+	Status       string    `json:"status"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e MediaFileThumbnailReady) EventID() string       { return e.ID }
+func (e MediaFileThumbnailReady) EventType() string     { return EventTypeMediaFileThumbnailReady }
+func (e MediaFileThumbnailReady) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileThumbnailReady) OccurredAt() time.Time { return e.Timestamp }

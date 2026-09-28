@@ -14,10 +14,12 @@ import (
 )
 
 type projectListRow struct {
-	ID        uuid.UUID
-	Name      string
-	Status    string
-	CreatedAt time.Time
+	ID           uuid.UUID
+	Name         string
+	Status       string
+	CreatedAt    time.Time
+	MediaFileID  *uuid.UUID `gorm:"column:media_file_id"`
+	ThumbnailKey string     `gorm:"column:thumbnail_key"`
 }
 
 func (projectListRow) TableName() string { return "project" }
@@ -47,10 +49,10 @@ type projectMediaFileRow struct {
 func (projectMediaFileRow) TableName() string { return "media_file" }
 
 var projectListSortColumns = map[string]string{
-	"created_at": "created_at",
-	"updated_at": "updated_at",
-	"name":       "name",
-	"status":     "status",
+	"created_at": "project.created_at",
+	"updated_at": "project.updated_at",
+	"name":       "project.name",
+	"status":     "project.status",
 }
 
 type projectReadRepository struct {
@@ -123,9 +125,26 @@ func (r *projectReadRepository) List(
 ) ([]domainproject.ProjectListView, int64, error) {
 	query.SortBy = normalizeProjectListSort(query.SortBy)
 
-	db := r.db.WithContext(ctx).Table("project").Where("user_id = ?", userID)
+	db := r.db.WithContext(ctx).Table("project").
+		Select(
+			"project.id",
+			"project.name",
+			"project.status",
+			"project.created_at",
+			"thumb.media_file_id",
+			"thumb.thumbnail_key",
+		).
+		Joins(`LEFT JOIN LATERAL (
+			SELECT id AS media_file_id, thumbnail_key
+			FROM media_file
+			WHERE media_file.project_id = project.id
+			  AND media_file.thumbnail_key <> ''
+			ORDER BY media_file.created_at ASC
+			LIMIT 1
+		) AS thumb ON TRUE`).
+		Where("project.user_id = ?", userID)
 	if search := strings.TrimSpace(query.Search); search != "" {
-		db = db.Where("name ILIKE ? ESCAPE '\\'", "%"+escapeLike(search)+"%")
+		db = db.Where("project.name ILIKE ? ESCAPE '\\'", "%"+escapeLike(search)+"%")
 	}
 
 	scoped, total, err := Paginate(db, query)
@@ -134,18 +153,23 @@ func (r *projectReadRepository) List(
 	}
 
 	var rows []projectListRow
-	if err := scoped.Select("id", "name", "status", "created_at").Find(&rows).Error; err != nil {
+	if err := scoped.Find(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 
 	views := make([]domainproject.ProjectListView, 0, len(rows))
 	for _, row := range rows {
-		views = append(views, domainproject.ProjectListView{
-			ID:        row.ID,
-			Name:      row.Name,
-			Status:    row.Status,
-			CreatedAt: row.CreatedAt,
-		})
+		view := domainproject.ProjectListView{
+			ID:           row.ID,
+			Name:         row.Name,
+			Status:       row.Status,
+			CreatedAt:    row.CreatedAt,
+			ThumbnailKey: row.ThumbnailKey,
+		}
+		if row.MediaFileID != nil {
+			view.MediaFileID = *row.MediaFileID
+		}
+		views = append(views, view)
 	}
 	return views, total, nil
 }
@@ -154,7 +178,7 @@ func normalizeProjectListSort(sortBy string) string {
 	if column, ok := projectListSortColumns[sortBy]; ok {
 		return column
 	}
-	return "created_at"
+	return "project.created_at"
 }
 
 func escapeLike(value string) string {

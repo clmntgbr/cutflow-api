@@ -23,10 +23,12 @@ type ProjectReadRepository interface {
 
 // ProjectListView is a lean row for short list calls.
 type ProjectListView struct {
-	ID        uuid.UUID
-	Name      string
-	Status    string
-	CreatedAt time.Time
+	ID           uuid.UUID
+	Name         string
+	Status       string
+	CreatedAt    time.Time
+	MediaFileID  uuid.UUID
+	ThumbnailKey string
 }
 
 type ProjectDetailView struct {
@@ -47,7 +49,6 @@ type ProjectMediaFileView struct {
 	StorageKey       string
 	OriginalURL      string
 	ThumbnailKey     string
-	ThumbnailURL     string
 	Status           string
 	CreatedAt        time.Time
 }

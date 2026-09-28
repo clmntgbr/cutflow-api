@@ -22,17 +22,20 @@ type GenerateThumbnailHandler struct {
 	mediaRepo domainmediafile.MediaFileWriteRepository
 	storage   port.Storage
 	extractor port.FrameExtractor
+	outbox    port.OutboxRepository
 }
 
 func NewGenerateThumbnailHandler(
 	mediaRepo domainmediafile.MediaFileWriteRepository,
 	storage port.Storage,
 	extractor port.FrameExtractor,
+	outbox port.OutboxRepository,
 ) *GenerateThumbnailHandler {
 	return &GenerateThumbnailHandler{
 		mediaRepo: mediaRepo,
 		storage:   storage,
 		extractor: extractor,
+		outbox:    outbox,
 	}
 }
 
@@ -91,6 +94,12 @@ func (h *GenerateThumbnailHandler) storeThumbnail(
 	if err := h.storage.Put(ctx, key, bytes.NewReader(data), int64(len(data)), "image/jpeg"); err != nil {
 		return err
 	}
+
 	media.SetThumbnailKey(key)
-	return h.mediaRepo.UpdateThumbnailKey(ctx, media.ID, key)
+	return h.mediaRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+		if err := h.mediaRepo.UpdateThumbnailKey(txCtx, media.ID, key); err != nil {
+			return err
+		}
+		return h.outbox.StoreEvents(txCtx, media.PullEvents())
+	})
 }

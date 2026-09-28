@@ -64,6 +64,10 @@ func TestProjectHandler_List_Success(t *testing.T) {
 	if item["name"] != "Demo" {
 		t.Fatalf("name: got %v", item["name"])
 	}
+	wantThumb := "/api/media-files/" + testutil.TestMediaFileID.String() + "/thumbnail"
+	if item["thumbnailUrl"] != wantThumb {
+		t.Fatalf("thumbnailUrl: got %v want %s", item["thumbnailUrl"], wantThumb)
+	}
 	if _, hasUpdatedAt := item["updatedAt"]; hasUpdatedAt {
 		t.Fatal("list item must not include updatedAt")
 	}
@@ -188,6 +192,10 @@ func TestProjectHandler_GetByID_Success(t *testing.T) {
 	}
 	if out.MediaFiles[0].OriginalURL == nil || *out.MediaFiles[0].OriginalURL == "" {
 		t.Fatal("expected original url")
+	}
+	wantThumb := "/api/media-files/" + testutil.TestMediaFileID.String() + "/thumbnail"
+	if out.MediaFiles[0].ThumbnailURL == nil || *out.MediaFiles[0].ThumbnailURL != wantThumb {
+		t.Fatalf("thumbnail url: got %v want %s", out.MediaFiles[0].ThumbnailURL, wantThumb)
 	}
 }
 
