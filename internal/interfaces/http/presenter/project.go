@@ -49,14 +49,15 @@ func NewProjectListResponseFromViews(views []domainproject.ProjectListView) []Pr
 }
 
 type ProjectDetailResponse struct {
-	ID         string                     `json:"id"`
-	Name       string                     `json:"name"`
-	Status     string                     `json:"status"`
-	CreatedAt  time.Time                  `json:"createdAt"`
-	UpdatedAt  time.Time                  `json:"updatedAt"`
-	MediaFiles []ProjectMediaFileResponse `json:"mediaFiles"`
-	Jobs       []ProjectJobResponse       `json:"jobs"`
-	Timelines  []ProjectTimelineResponse  `json:"timelines"`
+	ID             string                              `json:"id"`
+	Name           string                              `json:"name"`
+	Status         string                              `json:"status"`
+	CreatedAt      time.Time                           `json:"createdAt"`
+	UpdatedAt      time.Time                           `json:"updatedAt"`
+	MediaFiles     []ProjectMediaFileResponse          `json:"mediaFiles"`
+	Jobs           []ProjectJobResponse                `json:"jobs"`
+	Timelines      []ProjectTimelineResponse           `json:"timelines"`
+	Configurations []ProjectMediaConfigurationResponse `json:"configurations"`
 }
 
 type ProjectMediaFileResponse struct {
@@ -125,6 +126,30 @@ type ProjectEditDecisionResponse struct {
 	Reasons       []string `json:"reasons"`
 }
 
+type ProjectMediaConfigurationResponse struct {
+	ID                           string   `json:"id"`
+	MediaFileID                  string   `json:"mediaFileId"`
+	SilenceRemovalEnabled        bool     `json:"silenceRemovalEnabled"`
+	SilenceThresholdMode         string   `json:"silenceThresholdMode"`
+	SilenceThresholdDB           *float64 `json:"silenceThresholdDb"`
+	NoiseFloorDB                 *float64 `json:"noiseFloorDb"`
+	CalculatedSilenceThresholdDB *float64 `json:"calculatedSilenceThresholdDb"`
+	SilenceDetectionLevel        string   `json:"silenceDetectionLevel"`
+	SilencePaddingBeforeMs       int      `json:"silencePaddingBeforeMs"`
+	SilencePaddingAfterMs        int      `json:"silencePaddingAfterMs"`
+	SilenceMinDurationMs         int      `json:"silenceMinDurationMs"`
+	SpeechMinDurationMs          int      `json:"speechMinDurationMs"`
+	FillerRemovalEnabled         bool     `json:"fillerRemovalEnabled"`
+	RepetitionRemovalEnabled     bool     `json:"repetitionRemovalEnabled"`
+	SubtitlesEnabled             bool     `json:"subtitlesEnabled"`
+	SubtitleMaxWords             int      `json:"subtitleMaxWords"`
+	ViralDetectionEnabled        bool     `json:"viralDetectionEnabled"`
+	ViralClipMinDurationMs       int      `json:"viralClipMinDurationMs"`
+	ViralClipMaxDurationMs       int      `json:"viralClipMaxDurationMs"`
+	ViralMaxCandidates           int      `json:"viralMaxCandidates"`
+	ViralMinScore                float64  `json:"viralMinScore"`
+}
+
 func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) ProjectDetailResponse {
 	mediaFiles := make([]ProjectMediaFileResponse, 0, len(view.MediaFiles))
 	for _, media := range view.MediaFiles {
@@ -148,14 +173,15 @@ func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) Proj
 		})
 	}
 	return ProjectDetailResponse{
-		ID:         view.ID.String(),
-		Name:       view.Name,
-		Status:     view.Status,
-		CreatedAt:  view.CreatedAt,
-		UpdatedAt:  view.UpdatedAt,
-		MediaFiles: mediaFiles,
-		Jobs:       newProjectJobResponses(view.Jobs),
-		Timelines:  newProjectTimelineResponses(view.Timelines),
+		ID:             view.ID.String(),
+		Name:           view.Name,
+		Status:         view.Status,
+		CreatedAt:      view.CreatedAt,
+		UpdatedAt:      view.UpdatedAt,
+		MediaFiles:     mediaFiles,
+		Jobs:           newProjectJobResponses(view.Jobs),
+		Timelines:      newProjectTimelineResponses(view.Timelines),
+		Configurations: newProjectConfigurationResponses(view.Configurations),
 	}
 }
 
@@ -221,6 +247,38 @@ func newProjectTimelineResponses(timelines []domainproject.ProjectTimelineView) 
 			Decisions:     decisions,
 			CreatedAt:     tl.CreatedAt,
 			UpdatedAt:     tl.UpdatedAt,
+		})
+	}
+	return out
+}
+
+func newProjectConfigurationResponses(
+	configurations []domainproject.ProjectMediaConfigurationView,
+) []ProjectMediaConfigurationResponse {
+	out := make([]ProjectMediaConfigurationResponse, 0, len(configurations))
+	for _, cfg := range configurations {
+		out = append(out, ProjectMediaConfigurationResponse{
+			ID:                           cfg.ID.String(),
+			MediaFileID:                  cfg.MediaFileID.String(),
+			SilenceRemovalEnabled:        cfg.SilenceRemovalEnabled,
+			SilenceThresholdMode:         cfg.SilenceThresholdMode,
+			SilenceThresholdDB:           cfg.SilenceThresholdDB,
+			NoiseFloorDB:                 cfg.NoiseFloorDB,
+			CalculatedSilenceThresholdDB: cfg.CalculatedSilenceThresholdDB,
+			SilenceDetectionLevel:        cfg.SilenceDetectionLevel,
+			SilencePaddingBeforeMs:       cfg.SilencePaddingBeforeMs,
+			SilencePaddingAfterMs:        cfg.SilencePaddingAfterMs,
+			SilenceMinDurationMs:         cfg.SilenceMinDurationMs,
+			SpeechMinDurationMs:          cfg.SpeechMinDurationMs,
+			FillerRemovalEnabled:         cfg.FillerRemovalEnabled,
+			RepetitionRemovalEnabled:     cfg.RepetitionRemovalEnabled,
+			SubtitlesEnabled:             cfg.SubtitlesEnabled,
+			SubtitleMaxWords:             cfg.SubtitleMaxWords,
+			ViralDetectionEnabled:        cfg.ViralDetectionEnabled,
+			ViralClipMinDurationMs:       cfg.ViralClipMinDurationMs,
+			ViralClipMaxDurationMs:       cfg.ViralClipMaxDurationMs,
+			ViralMaxCandidates:           cfg.ViralMaxCandidates,
+			ViralMinScore:                cfg.ViralMinScore,
 		})
 	}
 	return out

@@ -197,7 +197,35 @@ func sampleProjectDetailView() *domainproject.ProjectDetailView {
 				UpdatedAt: time.Date(2026, 9, 28, 10, 10, 0, 0, time.UTC),
 			},
 		},
+		Configurations: []domainproject.ProjectMediaConfigurationView{
+			{
+				ID:                           uuid.MustParse("01960000-0000-7000-8000-000000000007"),
+				MediaFileID:                  testutil.TestMediaFileID,
+				SilenceRemovalEnabled:        true,
+				SilenceThresholdMode:         "auto",
+				NoiseFloorDB:                 floatPtr(-31.4),
+				CalculatedSilenceThresholdDB: floatPtr(-21.4),
+				SilenceDetectionLevel:        "aggressive",
+				SilencePaddingBeforeMs:       50,
+				SilencePaddingAfterMs:        150,
+				SilenceMinDurationMs:         500,
+				SpeechMinDurationMs:          300,
+				FillerRemovalEnabled:         true,
+				RepetitionRemovalEnabled:     true,
+				SubtitlesEnabled:             true,
+				SubtitleMaxWords:             3,
+				ViralDetectionEnabled:        true,
+				ViralClipMinDurationMs:       20000,
+				ViralClipMaxDurationMs:       90000,
+				ViralMaxCandidates:           10,
+				ViralMinScore:                0.7,
+			},
+		},
 	}
+}
+
+func floatPtr(v float64) *float64 {
+	return &v
 }
 
 func unusedUUID() uuid.UUID {

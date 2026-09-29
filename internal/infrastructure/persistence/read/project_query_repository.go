@@ -112,6 +112,32 @@ type projectEditDecisionRow struct {
 
 func (projectEditDecisionRow) TableName() string { return "edit_decision" }
 
+type projectMediaConfigurationRow struct {
+	ID                           uuid.UUID
+	MediaFileID                  uuid.UUID `gorm:"column:media_file_id"`
+	SilenceRemovalEnabled        bool      `gorm:"column:silence_removal_enabled"`
+	SilenceThresholdMode         string    `gorm:"column:silence_threshold_mode"`
+	SilenceThresholdDB           *float64  `gorm:"column:silence_threshold_db"`
+	NoiseFloorDB                 *float64  `gorm:"column:noise_floor_db"`
+	CalculatedSilenceThresholdDB *float64  `gorm:"column:calculated_silence_threshold_db"`
+	SilenceDetectionLevel        string    `gorm:"column:silence_detection_level"`
+	SilencePaddingBeforeMs       int       `gorm:"column:silence_padding_before_ms"`
+	SilencePaddingAfterMs        int       `gorm:"column:silence_padding_after_ms"`
+	SilenceMinDurationMs         int       `gorm:"column:silence_min_duration_ms"`
+	SpeechMinDurationMs          int       `gorm:"column:speech_min_duration_ms"`
+	FillerRemovalEnabled         bool      `gorm:"column:filler_removal_enabled"`
+	RepetitionRemovalEnabled     bool      `gorm:"column:repetition_removal_enabled"`
+	SubtitlesEnabled             bool      `gorm:"column:subtitles_enabled"`
+	SubtitleMaxWords             int       `gorm:"column:subtitle_max_words"`
+	ViralDetectionEnabled        bool      `gorm:"column:viral_detection_enabled"`
+	ViralClipMinDurationMs       int       `gorm:"column:viral_clip_min_duration_ms"`
+	ViralClipMaxDurationMs       int       `gorm:"column:viral_clip_max_duration_ms"`
+	ViralMaxCandidates           int       `gorm:"column:viral_max_candidates"`
+	ViralMinScore                float64   `gorm:"column:viral_min_score"`
+}
+
+func (projectMediaConfigurationRow) TableName() string { return "media_configuration" }
+
 var projectListSortColumns = map[string]string{
 	"created_at": "project.created_at",
 	"updated_at": "project.updated_at",
@@ -231,16 +257,89 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 		return nil, err
 	}
 
+	configurations, err := r.loadConfigurations(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domainproject.ProjectDetailView{
-		ID:         row.ID,
-		Name:       row.Name,
-		Status:     row.Status,
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
-		MediaFiles: mediaFiles,
-		Jobs:       jobs,
-		Timelines:  timelines,
+		ID:             row.ID,
+		Name:           row.Name,
+		Status:         row.Status,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
+		MediaFiles:     mediaFiles,
+		Jobs:           jobs,
+		Timelines:      timelines,
+		Configurations: configurations,
 	}, nil
+}
+
+func (r *projectReadRepository) loadConfigurations(
+	ctx context.Context,
+	projectID uuid.UUID,
+) ([]domainproject.ProjectMediaConfigurationView, error) {
+	var rows []projectMediaConfigurationRow
+	err := r.db.WithContext(ctx).
+		Table("media_configuration").
+		Select(
+			"media_configuration.id",
+			"media_configuration.media_file_id",
+			"media_configuration.silence_removal_enabled",
+			"media_configuration.silence_threshold_mode",
+			"media_configuration.silence_threshold_db",
+			"media_configuration.noise_floor_db",
+			"media_configuration.calculated_silence_threshold_db",
+			"media_configuration.silence_detection_level",
+			"media_configuration.silence_padding_before_ms",
+			"media_configuration.silence_padding_after_ms",
+			"media_configuration.silence_min_duration_ms",
+			"media_configuration.speech_min_duration_ms",
+			"media_configuration.filler_removal_enabled",
+			"media_configuration.repetition_removal_enabled",
+			"media_configuration.subtitles_enabled",
+			"media_configuration.subtitle_max_words",
+			"media_configuration.viral_detection_enabled",
+			"media_configuration.viral_clip_min_duration_ms",
+			"media_configuration.viral_clip_max_duration_ms",
+			"media_configuration.viral_max_candidates",
+			"media_configuration.viral_min_score",
+		).
+		Joins("INNER JOIN media_file ON media_file.id = media_configuration.media_file_id").
+		Where("media_file.project_id = ?", projectID).
+		Order("media_configuration.created_at ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]domainproject.ProjectMediaConfigurationView, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domainproject.ProjectMediaConfigurationView{
+			ID:                           row.ID,
+			MediaFileID:                  row.MediaFileID,
+			SilenceRemovalEnabled:        row.SilenceRemovalEnabled,
+			SilenceThresholdMode:         row.SilenceThresholdMode,
+			SilenceThresholdDB:           row.SilenceThresholdDB,
+			NoiseFloorDB:                 row.NoiseFloorDB,
+			CalculatedSilenceThresholdDB: row.CalculatedSilenceThresholdDB,
+			SilenceDetectionLevel:        row.SilenceDetectionLevel,
+			SilencePaddingBeforeMs:       row.SilencePaddingBeforeMs,
+			SilencePaddingAfterMs:        row.SilencePaddingAfterMs,
+			SilenceMinDurationMs:         row.SilenceMinDurationMs,
+			SpeechMinDurationMs:          row.SpeechMinDurationMs,
+			FillerRemovalEnabled:         row.FillerRemovalEnabled,
+			RepetitionRemovalEnabled:     row.RepetitionRemovalEnabled,
+			SubtitlesEnabled:             row.SubtitlesEnabled,
+			SubtitleMaxWords:             row.SubtitleMaxWords,
+			ViralDetectionEnabled:        row.ViralDetectionEnabled,
+			ViralClipMinDurationMs:       row.ViralClipMinDurationMs,
+			ViralClipMaxDurationMs:       row.ViralClipMaxDurationMs,
+			ViralMaxCandidates:           row.ViralMaxCandidates,
+			ViralMinScore:                row.ViralMinScore,
+		})
+	}
+	return out, nil
 }
 
 func (r *projectReadRepository) loadActiveTimelines(

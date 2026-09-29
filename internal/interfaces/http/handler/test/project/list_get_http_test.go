@@ -248,6 +248,19 @@ func TestProjectHandler_GetByID_Success(t *testing.T) {
 	if tl.Decisions[0].Type != "silence" || tl.Decisions[0].Action != "remove" {
 		t.Fatalf("decision: got type=%s action=%s", tl.Decisions[0].Type, tl.Decisions[0].Action)
 	}
+	if len(out.Configurations) != 1 {
+		t.Fatalf("configurations: got %d", len(out.Configurations))
+	}
+	cfg := out.Configurations[0]
+	if cfg.MediaFileID != testutil.TestMediaFileID.String() {
+		t.Fatalf("config mediaFileId: got %s", cfg.MediaFileID)
+	}
+	if cfg.CalculatedSilenceThresholdDB == nil || *cfg.CalculatedSilenceThresholdDB != -21.4 {
+		t.Fatalf("calculatedSilenceThresholdDb: got %v", cfg.CalculatedSilenceThresholdDB)
+	}
+	if cfg.NoiseFloorDB == nil || *cfg.NoiseFloorDB != -31.4 {
+		t.Fatalf("noiseFloorDb: got %v", cfg.NoiseFloorDB)
+	}
 }
 
 func TestProjectHandler_GetByID_Unauthorized(t *testing.T) {

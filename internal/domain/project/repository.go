@@ -33,14 +33,15 @@ type ProjectListView struct {
 }
 
 type ProjectDetailView struct {
-	ID         uuid.UUID
-	Name       string
-	Status     string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	MediaFiles []ProjectMediaFileView
-	Jobs       []ProjectJobView
-	Timelines  []ProjectTimelineView
+	ID             uuid.UUID
+	Name           string
+	Status         string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	MediaFiles     []ProjectMediaFileView
+	Jobs           []ProjectJobView
+	Timelines      []ProjectTimelineView
+	Configurations []ProjectMediaConfigurationView
 }
 
 type ProjectMediaFileView struct {
@@ -108,4 +109,28 @@ type ProjectEditDecisionView struct {
 	Source        string
 	Confidence    *float64
 	Reasons       []string
+}
+
+type ProjectMediaConfigurationView struct {
+	ID                           uuid.UUID
+	MediaFileID                  uuid.UUID
+	SilenceRemovalEnabled        bool
+	SilenceThresholdMode         string
+	SilenceThresholdDB           *float64
+	NoiseFloorDB                 *float64
+	CalculatedSilenceThresholdDB *float64
+	SilenceDetectionLevel        string
+	SilencePaddingBeforeMs       int
+	SilencePaddingAfterMs        int
+	SilenceMinDurationMs         int
+	SpeechMinDurationMs          int
+	FillerRemovalEnabled         bool
+	RepetitionRemovalEnabled     bool
+	SubtitlesEnabled             bool
+	SubtitleMaxWords             int
+	ViralDetectionEnabled        bool
+	ViralClipMinDurationMs       int
+	ViralClipMaxDurationMs       int
+	ViralMaxCandidates           int
+	ViralMinScore                float64
 }
