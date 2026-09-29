@@ -22,3 +22,7 @@ type MediaProbeResult struct {
 type MediaProber interface {
 	Probe(ctx context.Context, videoPath string) (MediaProbeResult, error)
 }
+
+type AudioExtractor interface {
+	Extract(ctx context.Context, videoPath, outputPath string) error
+}

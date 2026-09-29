@@ -46,6 +46,12 @@ type Config struct {
 	UploadURLTTL            time.Duration
 	ExpireUploadsInterval   time.Duration
 	MediaMaxSizeBytes       int64
+	SegmentDurationMs       int64
+	SegmentOverlapMs        int64
+	SegmentMaxCount         int
+	ExtractionQueue         string
+	ExtractionRoutingKey    string
+	ExtractionConcurrency   int
 }
 
 func Load() *Config {
@@ -89,6 +95,12 @@ func Load() *Config {
 		UploadURLTTL:            getEnvDuration("UPLOAD_URL_TTL", 15*time.Minute),
 		ExpireUploadsInterval:   getEnvDuration("EXPIRE_UPLOADS_INTERVAL", time.Minute),
 		MediaMaxSizeBytes:       getEnvInt64OrDefault("MEDIA_MAX_SIZE_BYTES", 2*1024*1024*1024),
+		SegmentDurationMs:       getEnvInt64OrDefault("SEGMENT_DURATION_MS", 5*60*1000),
+		SegmentOverlapMs:        getEnvInt64OrDefault("SEGMENT_OVERLAP_MS", 2*1000),
+		SegmentMaxCount:         getEnvIntOrDefault("SEGMENT_MAX_COUNT", 40),
+		ExtractionQueue:         getEnvOrDefault("EXTRACTION_QUEUE", "extraction"),
+		ExtractionRoutingKey:    getEnvOrDefault("EXTRACTION_ROUTING_KEY", "media_file.segments_ready.v1"),
+		ExtractionConcurrency:   getEnvIntOrDefault("EXTRACTION_CONCURRENCY", 2),
 	}
 }
 

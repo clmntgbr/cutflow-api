@@ -66,6 +66,32 @@ services:
       - api
     restart: unless-stopped
 
+  extraction:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: extraction
+    command: ["go", "run", "./cmd/extraction"]
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      EXTRACTION_QUEUE: ${EXTRACTION_QUEUE:-extraction}
+      EXTRACTION_ROUTING_KEY: ${EXTRACTION_ROUTING_KEY:-media_file.segments_ready.v1}
+      EXTRACTION_CONCURRENCY: ${EXTRACTION_CONCURRENCY:-2}
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - api
+    restart: unless-stopped
+
   database:
     container_name: datastore
     image: postgres:${POSTGRES_VERSION:-16}-alpine

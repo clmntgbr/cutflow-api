@@ -48,6 +48,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -a -installsuffix cgo \
     -ldflags="-w -s" \
+    -o extraction \
+    ./cmd/extraction
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -a -installsuffix cgo \
+    -ldflags="-w -s" \
     -o cli \
     ./cmd/cli
 
@@ -67,6 +73,7 @@ WORKDIR /home/appuser
 
 COPY --from=builder --chown=appuser:appuser /app/api .
 COPY --from=builder --chown=appuser:appuser /app/worker .
+COPY --from=builder --chown=appuser:appuser /app/extraction .
 COPY --from=builder --chown=appuser:appuser /app/cli .
 
 USER appuser

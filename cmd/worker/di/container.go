@@ -10,8 +10,10 @@ import (
 	eventuser "go-api/internal/application/event/user"
 	cmdmediafile "go-api/internal/application/command/mediafile"
 	"go-api/internal/application/registry"
+	domainmediaaudio "go-api/internal/domain/mediaaudio"
 	domainmediafile "go-api/internal/domain/mediafile"
 	domainproject "go-api/internal/domain/project"
+	domainsegment "go-api/internal/domain/segment"
 	domainuser "go-api/internal/domain/user"
 	"go-api/internal/infrastructure/centrifugo"
 	"go-api/internal/infrastructure/config"
@@ -57,6 +59,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	relay := outbox.NewRelay(outboxRepo, publisher, env.OutboxPollInterval, 50)
 
 	mediaFileWriteRepo := write.NewMediaFileWriteRepository(db)
+	segmentWriteRepo := write.NewSegmentWriteRepository(db)
 	dedupRepo := processed.NewRepository(db)
 	notifier := notification.NewLogNotifier()
 	realtimePublisher := centrifugo.NewPublisher(env)
@@ -79,6 +82,18 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		outboxRepo,
 	)
 	onUploadedProbe := eventmediafile.NewProbeMediaOnUploadedHandler(probeMediaHandler)
+
+	createSegmentsHandler := cmdmediafile.NewCreateSegmentsHandler(
+		mediaFileWriteRepo,
+		segmentWriteRepo,
+		outboxRepo,
+		domainsegment.PlanConfig{
+			DurationMs: env.SegmentDurationMs,
+			OverlapMs:  env.SegmentOverlapMs,
+			MaxCount:   env.SegmentMaxCount,
+		},
+	)
+	onReadySegments := eventmediafile.NewCreateSegmentsOnReadyHandler(createSegmentsHandler)
 
 	reg := registry.NewHandlerRegistry()
 
@@ -148,10 +163,30 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		"publish_media_file_ready_realtime",
 		publishMediaRealtime.OnReady,
 	))
+	reg.Register(domainmediafile.EventTypeMediaFileReady, dedup.With(
+		dedupRepo,
+		"create_segments_on_media_file_ready",
+		onReadySegments.Handle,
+	))
 	reg.Register(domainmediafile.EventTypeMediaFileProbeFailed, dedup.With(
 		dedupRepo,
 		"publish_media_file_probe_failed_realtime",
 		publishMediaRealtime.OnProbeFailed,
+	))
+	reg.Register(domainmediafile.EventTypeMediaFileSegmentsReady, dedup.With(
+		dedupRepo,
+		"publish_media_file_segments_ready_realtime",
+		publishMediaRealtime.OnSegmentsReady,
+	))
+	reg.Register(domainmediaaudio.EventTypeMediaAudioReady, dedup.With(
+		dedupRepo,
+		"publish_media_file_audio_ready_realtime",
+		publishMediaRealtime.OnAudioReady,
+	))
+	reg.Register(domainmediaaudio.EventTypeMediaAudioFailed, dedup.With(
+		dedupRepo,
+		"publish_media_file_audio_failed_realtime",
+		publishMediaRealtime.OnAudioFailed,
 	))
 	reg.Register(domainproject.EventTypeProjectUpdated, dedup.With(
 		dedupRepo,

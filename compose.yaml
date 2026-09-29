@@ -22,3 +22,14 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+
+  extraction:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: extraction
+    command: ["./extraction"]
+    env_file:
+      - .env
+    restart: unless-stopped

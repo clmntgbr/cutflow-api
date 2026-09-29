@@ -10,6 +10,7 @@ const (
 	EventTypeMediaFileProbing        = "media_file.probing.v1"
 	EventTypeMediaFileReady          = "media_file.ready.v1"
 	EventTypeMediaFileProbeFailed    = "media_file.probe_failed.v1"
+	EventTypeMediaFileSegmentsReady  = "media_file.segments_ready.v1"
 )
 
 type MediaFileCreated struct {
@@ -124,3 +125,19 @@ func (e MediaFileProbeFailed) EventID() string       { return e.ID }
 func (e MediaFileProbeFailed) EventType() string     { return EventTypeMediaFileProbeFailed }
 func (e MediaFileProbeFailed) AggregateID() string   { return e.MediaFileID }
 func (e MediaFileProbeFailed) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaFileSegmentsReady struct {
+	ID           string    `json:"eventId"`
+	MediaFileID  string    `json:"mediaFileId"`
+	ProjectID    string    `json:"projectId"`
+	UserID       string    `json:"userId"`
+	SegmentCount int       `json:"segmentCount"`
+	DurationMs   int64     `json:"durationMs"`
+	HasAudio     bool      `json:"hasAudio"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e MediaFileSegmentsReady) EventID() string       { return e.ID }
+func (e MediaFileSegmentsReady) EventType() string     { return EventTypeMediaFileSegmentsReady }
+func (e MediaFileSegmentsReady) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileSegmentsReady) OccurredAt() time.Time { return e.Timestamp }
