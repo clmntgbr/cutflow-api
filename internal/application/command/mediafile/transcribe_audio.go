@@ -12,6 +12,7 @@ import (
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
 	domaintranscript "go-api/internal/domain/transcript"
+	"go-api/internal/subtitle"
 
 	"github.com/google/uuid"
 )
@@ -98,15 +99,8 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 		return messaging.NonRetryable(err)
 	}
 
-	ass := result.ASS
-	if err := h.storage.Put(ctx, transcript.SRTStorageKey, bytes.NewReader([]byte(result.SRT)), int64(len(result.SRT)), "application/x-subrip"); err != nil {
-		return messaging.Retryable(err)
-	}
-	if err := h.storage.Put(ctx, transcript.ASSStorageKey, bytes.NewReader([]byte(ass)), int64(len(ass)), "text/x-ass"); err != nil {
-		return messaging.Retryable(err)
-	}
-
 	words := make([]domaintranscript.Word, 0, len(result.Words))
+	subtitleWords := make([]subtitle.Word, 0, len(result.Words))
 	for i, word := range result.Words {
 		words = append(words, domaintranscript.Word{
 			WordIndex:     i,
@@ -116,6 +110,22 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 			Confidence:    word.Confidence,
 			Kind:          domaintranscript.KindSpeech,
 		})
+		subtitleWords = append(subtitleWords, subtitle.Word{
+			Text:    word.Text,
+			StartMs: word.StartMs,
+			EndMs:   word.EndMs,
+		})
+	}
+
+	// ASS is generated from words + style (not from AssemblyAI SRT).
+	// Source timestamps for now; remapping onto the final timeline happens at render.
+	ass := subtitle.GenerateASS(subtitleWords, subtitle.TikTokClassic())
+
+	if err := h.storage.Put(ctx, transcript.SRTStorageKey, bytes.NewReader([]byte(result.SRT)), int64(len(result.SRT)), "application/x-subrip"); err != nil {
+		return messaging.Retryable(err)
+	}
+	if err := h.storage.Put(ctx, transcript.ASSStorageKey, bytes.NewReader([]byte(ass)), int64(len(ass)), "text/x-ass"); err != nil {
+		return messaging.Retryable(err)
 	}
 
 	return h.complete(ctx, cmd.MediaFileID, cmd.JobID, result.ProviderJobID, result.Language, result.Text, words)

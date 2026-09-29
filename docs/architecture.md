@@ -667,13 +667,18 @@ réutilisent la même clé MinIO.
 Pas de `TranscriptSegment` / merge d'overlap : un seul job AssemblyAI
 par média produit :
 
-- `transcript.text` + `transcript_word[]` ;
-- `subtitles.srt` (API AssemblyAI) puis `subtitles.ass` (conversion
-  locale).
+- `transcript.text` + `transcript_word[]` (timestamps source) ;
+- `subtitles.srt` (API AssemblyAI, fallback plat).
+
+L'ASS animé (highlight mot actif) n'est **pas** produit par le provider.
+Il est généré localement par le `SubtitleGenerator` à partir de
+`TranscriptWord[]` + `SubtitleStyle` (preset TikTok Classic par défaut
+aujourd'hui). Le remapping `SourceTime → OutputTime` s'appliquera plus
+tard via la Timeline avant régénération ASS au rendu.
 
 Le transcript global sert ensuite à détecter fillers / répétitions,
-générer les sous-titres remappés sur la timeline, et analyser les
-moments viraux.
+régénérer les sous-titres (plusieurs presets), et analyser les moments
+viraux.
 
 ### 14.4 Analyse virale globale
 

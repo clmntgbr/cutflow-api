@@ -48,7 +48,6 @@ type TranscriptResult struct {
 	Language      string
 	Text          string
 	SRT           string
-	ASS           string
 	Words         []TranscriptWord
 }
 

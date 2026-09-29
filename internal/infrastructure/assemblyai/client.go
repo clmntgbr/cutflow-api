@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"go-api/internal/domain/port"
-	"go-api/internal/infrastructure/subtitle"
 )
 
 const (
@@ -76,7 +75,6 @@ func (c *Client) Transcribe(ctx context.Context, audioPath string) (port.Transcr
 		Language:      detail.LanguageCode,
 		Text:          detail.Text,
 		SRT:           srt,
-		ASS:           subtitle.SRTToASS(srt),
 		Words:         words,
 	}, nil
 }
