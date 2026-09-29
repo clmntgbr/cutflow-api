@@ -60,3 +60,32 @@ type TranscriptResult struct {
 type SpeechTranscriber interface {
 	Transcribe(ctx context.Context, audioPath string) (TranscriptResult, error)
 }
+
+// ViralLLMProposal is a raw LLM suggestion before boundary resolve / validation.
+type ViralLLMProposal struct {
+	StartMs         int64
+	EndMs           int64
+	Score           float64
+	HookScore       *float64
+	StandaloneScore *float64
+	PayoffScore     *float64
+	InterestScore   *float64
+	Title           string
+	Hook            string
+	Reason          string
+}
+
+type ViralAnalyzeInput struct {
+	TranscriptText string
+	Language       string
+	MinDurationMs  int64
+	MaxDurationMs  int64
+	MaxCandidates  int
+}
+
+// ViralAnalyzer calls an LLM provider to propose short-form clip windows.
+type ViralAnalyzer interface {
+	Analyze(ctx context.Context, input ViralAnalyzeInput) ([]ViralLLMProposal, error)
+	Provider() string
+	Model() string
+}

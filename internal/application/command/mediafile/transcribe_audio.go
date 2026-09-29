@@ -228,27 +228,49 @@ func (h *TranscribeAudioHandler) complete(
 			}
 		}
 
-		// Text analysis runs right after transcription — TranscriptWord[] only,
-		// independent of silence / audio analysis.
+		// Text analysis + viral analysis fan-out after transcription — both use
+		// TranscriptWord[] only; neither waits for silence / audio analysis.
 		analysisJob := domainjob.New(
 			transcript.ProjectID,
 			transcript.MediaFileID,
 			transcript.UserID,
 			domainjob.NameAnalyzeTranscript,
 		)
+		viralJob := domainjob.New(
+			transcript.ProjectID,
+			transcript.MediaFileID,
+			transcript.UserID,
+			domainjob.NameAnalyzeViral,
+		)
 		if err := h.jobRepo.Save(txCtx, analysisJob); err != nil {
 			return messaging.Retryable(err)
 		}
+		if err := h.jobRepo.Save(txCtx, viralJob); err != nil {
+			return messaging.Retryable(err)
+		}
+		now := time.Now().UTC()
 		events = append(events, analysisJob.PullEvents()...)
-		events = append(events, domainmediafile.MediaFileAnalysisRequested{
-			ID:           uuid.New().String(),
-			MediaFileID:  transcript.MediaFileID.String(),
-			ProjectID:    transcript.ProjectID.String(),
-			UserID:       transcript.UserID.String(),
-			JobID:        analysisJob.ID.String(),
-			TranscriptID: transcript.ID.String(),
-			Timestamp:    time.Now().UTC(),
-		})
+		events = append(events, viralJob.PullEvents()...)
+		events = append(events,
+			domainmediafile.MediaFileAnalysisRequested{
+				ID:           uuid.New().String(),
+				MediaFileID:  transcript.MediaFileID.String(),
+				ProjectID:    transcript.ProjectID.String(),
+				UserID:       transcript.UserID.String(),
+				JobID:        analysisJob.ID.String(),
+				TranscriptID: transcript.ID.String(),
+				Timestamp:    now,
+			},
+			domainmediafile.MediaFileViralRequested{
+				ID:           uuid.New().String(),
+				MediaFileID:  transcript.MediaFileID.String(),
+				ProjectID:    transcript.ProjectID.String(),
+				UserID:       transcript.UserID.String(),
+				JobID:        viralJob.ID.String(),
+				TranscriptID: transcript.ID.String(),
+				Timestamp:    now,
+			},
+		)
 
 		return h.outbox.StoreEvents(txCtx, events)
 	})

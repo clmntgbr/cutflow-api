@@ -28,6 +28,8 @@ type MediaConfigurationModel struct {
 	ViralDetectionEnabled        bool      `gorm:"column:viral_detection_enabled"`
 	ViralClipMinDurationMs       int       `gorm:"column:viral_clip_min_duration_ms"`
 	ViralClipMaxDurationMs       int       `gorm:"column:viral_clip_max_duration_ms"`
+	ViralMaxCandidates           int       `gorm:"column:viral_max_candidates"`
+	ViralMinScore                float64   `gorm:"column:viral_min_score"`
 	CreatedAt                    time.Time `gorm:"column:created_at"`
 	UpdatedAt                    time.Time `gorm:"column:updated_at"`
 }
@@ -55,6 +57,8 @@ func mediaConfigurationModelFromDomain(c *domainmediaconfig.MediaConfiguration) 
 		ViralDetectionEnabled:        c.ViralDetectionEnabled,
 		ViralClipMinDurationMs:       c.ViralClipMinDurationMs,
 		ViralClipMaxDurationMs:       c.ViralClipMaxDurationMs,
+		ViralMaxCandidates:           c.ViralMaxCandidates,
+		ViralMinScore:                c.ViralMinScore,
 		CreatedAt:                    c.CreatedAt,
 		UpdatedAt:                    c.UpdatedAt,
 	}
@@ -81,6 +85,8 @@ func mediaConfigurationDomainFromModel(m *MediaConfigurationModel) *domainmediac
 		ViralDetectionEnabled:        m.ViralDetectionEnabled,
 		ViralClipMinDurationMs:       m.ViralClipMinDurationMs,
 		ViralClipMaxDurationMs:       m.ViralClipMaxDurationMs,
+		ViralMaxCandidates:           m.ViralMaxCandidates,
+		ViralMinScore:                m.ViralMinScore,
 		CreatedAt:                    m.CreatedAt,
 		UpdatedAt:                    m.UpdatedAt,
 	}

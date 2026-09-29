@@ -23,6 +23,8 @@ const (
 	DefaultSubtitleMaxWords = 3
 	DefaultViralMinMs       = 20_000
 	DefaultViralMaxMs       = 90_000
+	DefaultViralMaxCandidates = 10
+	DefaultViralMinScore      = 0.70
 )
 
 // LevelOffsetDB is added to the estimated noise floor to get the silence threshold.
@@ -64,6 +66,8 @@ type MediaConfiguration struct {
 	ViralDetectionEnabled   bool
 	ViralClipMinDurationMs  int
 	ViralClipMaxDurationMs  int
+	ViralMaxCandidates      int
+	ViralMinScore           float64
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -88,6 +92,8 @@ func NewDefault(mediaFileID uuid.UUID) *MediaConfiguration {
 		ViralDetectionEnabled:    true,
 		ViralClipMinDurationMs:   DefaultViralMinMs,
 		ViralClipMaxDurationMs:   DefaultViralMaxMs,
+		ViralMaxCandidates:       DefaultViralMaxCandidates,
+		ViralMinScore:            DefaultViralMinScore,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

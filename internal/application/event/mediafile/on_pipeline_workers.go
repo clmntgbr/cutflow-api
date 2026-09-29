@@ -152,6 +152,56 @@ func (h *AnalyzeTranscriptOnRequestedHandler) Handle(ctx context.Context, payloa
 	})
 }
 
+type AnalyzeViralOnRequestedHandler struct {
+	analyze *cmdmediafile.AnalyzeViralHandler
+}
+
+func NewAnalyzeViralOnRequestedHandler(analyze *cmdmediafile.AnalyzeViralHandler) *AnalyzeViralOnRequestedHandler {
+	return &AnalyzeViralOnRequestedHandler{analyze: analyze}
+}
+
+func (h *AnalyzeViralOnRequestedHandler) Handle(ctx context.Context, payload []byte) error {
+	var evt domainmediafile.MediaFileViralRequested
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	mediaFileID, err := uuid.Parse(evt.MediaFileID)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	projectID, err := uuid.Parse(evt.ProjectID)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	userID, err := uuid.Parse(evt.UserID)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	transcriptID := uuid.Nil
+	if evt.TranscriptID != "" {
+		transcriptID, err = uuid.Parse(evt.TranscriptID)
+		if err != nil {
+			return messaging.NonRetryable(err)
+		}
+	}
+	jobID := uuid.Nil
+	if evt.JobID != "" {
+		jobID, err = uuid.Parse(evt.JobID)
+		if err != nil {
+			return messaging.NonRetryable(err)
+		}
+	}
+
+	log.Printf("viral worker received mediaFileId=%s jobId=%s", evt.MediaFileID, evt.JobID)
+	return h.analyze.Handle(ctx, cmdmediafile.AnalyzeViralCommand{
+		MediaFileID:  mediaFileID,
+		TranscriptID: transcriptID,
+		ProjectID:    projectID,
+		UserID:       userID,
+		JobID:        jobID,
+	})
+}
+
 type ExtractAudioOnReadyHandler struct {
 	extract *cmdmediafile.ExtractAudioHandler
 }

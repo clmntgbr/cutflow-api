@@ -63,6 +63,15 @@ type Config struct {
 	AnalysisQueue           string
 	AnalysisRoutingKey      string
 	AnalysisConcurrency     int
+	ViralQueue              string
+	ViralRoutingKey         string
+	ViralConcurrency        int
+	ViralLLMProvider        string
+	ViralLLMModel           string
+	ViralLLMAPIKey          string
+	ViralLLMBaseURL         string
+	ViralChunkDurationMs    int64
+	ViralChunkOverlapMs     int64
 }
 
 func Load() *Config {
@@ -123,6 +132,15 @@ func Load() *Config {
 		AnalysisQueue:           getEnvOrDefault("ANALYSIS_QUEUE", "analysis"),
 		AnalysisRoutingKey:      getEnvOrDefault("ANALYSIS_ROUTING_KEY", "media_file.analysis_requested.v1"),
 		AnalysisConcurrency:     getEnvIntOrDefault("ANALYSIS_CONCURRENCY", 5),
+		ViralQueue:              getEnvOrDefault("VIRAL_QUEUE", "viral"),
+		ViralRoutingKey:         getEnvOrDefault("VIRAL_ROUTING_KEY", "media_file.viral_requested.v1"),
+		ViralConcurrency:        getEnvIntOrDefault("VIRAL_CONCURRENCY", 2),
+		ViralLLMProvider:        getEnvOrDefault("VIRAL_LLM_PROVIDER", "openai"),
+		ViralLLMModel:           getEnvOrDefault("VIRAL_LLM_MODEL", "gpt-4o-mini"),
+		ViralLLMAPIKey:          getEnvOrDefault("VIRAL_LLM_API_KEY", ""),
+		ViralLLMBaseURL:         getEnvOrDefault("VIRAL_LLM_BASE_URL", ""),
+		ViralChunkDurationMs:    getEnvInt64OrDefault("VIRAL_CHUNK_DURATION_MS", 600000),
+		ViralChunkOverlapMs:     getEnvInt64OrDefault("VIRAL_CHUNK_OVERLAP_MS", 30000),
 	}
 }
 

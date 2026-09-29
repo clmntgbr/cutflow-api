@@ -19,6 +19,7 @@ import (
 	domaintranscript "go-api/internal/domain/transcript"
 	domaintranscriptissue "go-api/internal/domain/transcriptissue"
 	domainuser "go-api/internal/domain/user"
+	domainviral "go-api/internal/domain/viral"
 	"go-api/internal/infrastructure/centrifugo"
 	"go-api/internal/infrastructure/config"
 	inframedia "go-api/internal/infrastructure/media"
@@ -189,6 +190,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo,
 		"publish_media_file_transcript_analysis_ready_realtime",
 		publishMediaRealtime.OnTranscriptAnalysisReady,
+	))
+	reg.Register(domainviral.EventTypeViralReady, dedup.With(
+		dedupRepo,
+		"publish_media_file_viral_ready_realtime",
+		publishMediaRealtime.OnViralReady,
 	))
 	reg.Register(domainproject.EventTypeProjectUpdated, dedup.With(
 		dedupRepo,

@@ -13,6 +13,7 @@ const (
 	EventTypeMediaFileSilenceRequested    = "media_file.silence_requested.v1"
 	EventTypeMediaFileTranscriptRequested = "media_file.transcript_requested.v1"
 	EventTypeMediaFileAnalysisRequested   = "media_file.analysis_requested.v1"
+	EventTypeMediaFileViralRequested      = "media_file.viral_requested.v1"
 )
 
 type MediaFileCreated struct {
@@ -174,3 +175,19 @@ func (e MediaFileAnalysisRequested) EventID() string       { return e.ID }
 func (e MediaFileAnalysisRequested) EventType() string     { return EventTypeMediaFileAnalysisRequested }
 func (e MediaFileAnalysisRequested) AggregateID() string   { return e.MediaFileID }
 func (e MediaFileAnalysisRequested) OccurredAt() time.Time { return e.Timestamp }
+
+// MediaFileViralRequested is emitted after transcription completes (parallel with text analysis).
+type MediaFileViralRequested struct {
+	ID           string    `json:"eventId"`
+	MediaFileID  string    `json:"mediaFileId"`
+	ProjectID    string    `json:"projectId"`
+	UserID       string    `json:"userId"`
+	JobID        string    `json:"jobId"`
+	TranscriptID string    `json:"transcriptId"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e MediaFileViralRequested) EventID() string       { return e.ID }
+func (e MediaFileViralRequested) EventType() string     { return EventTypeMediaFileViralRequested }
+func (e MediaFileViralRequested) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileViralRequested) OccurredAt() time.Time { return e.Timestamp }

@@ -64,48 +64,29 @@
 │ (après Timeline)            │    │                             │
 └──────────────┬──────────────┘    └──────────────┬──────────────┘
                │                                  │
-               │ après transcript only            │
-               │ (pas de dépendance silence)      │
-               ▼                                  │
-┌─────────────────────────────┐                   │
-│ 5. TEXT ANALYSIS            │                   │
-│                             │                   │
-│ TranscriptWord[] uniquement │                   │
-│ (ni vidéo ni audio)         │                   │
-│      │                      │                   │
-│      ├── Fillers            │                   │
-│      ├── Répétitions        │                   │
-│      └── Faux départs       │                   │
-│                             │                   │
-│ DetectedTranscriptIssue[]   │                   │
-│ (filler / repetition /      │                   │
-│  false_start)               │                   │
-└──────────────┬──────────────┘                   │
-               │                                  │
-               ├─────────────────┐                │
-               ▼                 ▼                │
+               │ transcript.completed             │
+               │ (indépendant du silence)         │
+      ┌────────┴────────┐                         │
+      ▼                 ▼                         │
+┌───────────────┐  ┌────────────────┐             │
+│ 5A. TEXT      │  │ 5B. VIRAL      │             │
+│ ANALYSIS      │  │ ANALYSIS       │             │
+│               │  │                │             │
+│ TranscriptWord│  │ TranscriptWord │             │
+│      │        │  │      ↓         │             │
+│ fillers       │  │ Formatter      │             │
+│ répétitions   │  │ Chunker        │             │
+│ faux départs  │  │ GPT/DeepSeek   │             │
+│               │  │ Boundary       │             │
+│ DetectedIssue │  │ Dedup / Rank   │             │
+│               │  │                │             │
+│               │  │ ViralCandidate │             │
+│               │  │ (SOURCE TIME)  │             │
+└───────┬───────┘  └───────┬────────┘             │
+        │                  │                      │
+        └────────┬─────────┘                      │
+                 │                                │
+                 ▼                                │
 ┌──────────────────────────────────────────────┐
-│ 6. VIRAL ANALYSIS                            │
-│                                              │
-│ Transcript global                           │
-│       ↓                                      │
-│ segmentation sémantique                      │
-│       ↓                                      │
-│ candidats 20-90 sec                          │
-│       ↓                                      │
-│ LLM                                          │
-│       ↓                                      │
-│ score                                        │
-│ hook                                         │
-│ autonomie du passage                         │
-│ payoff                                       │
-│       ↓                                      │
-│ ViralCandidate[]                             │
-└──────────────────────┬───────────────────────┘
-                       │
-                       │
-      ┌────────────────┴────────────────┐
-      │                                 │
-      │ Toutes les analyses sont prêtes │
-      │                                 │
-      ▼                                 ▼
+│ Analyses prêtes (silence ∥ text ∥ viral)     │
+└──────────────────────────────────────────────┘

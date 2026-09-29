@@ -13,6 +13,7 @@ import (
 	domainsilence "go-api/internal/domain/silence"
 	domaintranscript "go-api/internal/domain/transcript"
 	domaintranscriptissue "go-api/internal/domain/transcriptissue"
+	domainviral "go-api/internal/domain/viral"
 )
 
 type PublishRealtimeHandler struct {
@@ -48,6 +49,7 @@ type mediaFileRealtimePayload struct {
 	FillerCount     int       `json:"fillerCount,omitempty"`
 	RepetitionCount int       `json:"repetitionCount,omitempty"`
 	FalseStartCount int       `json:"falseStartCount,omitempty"`
+	CandidateCount  int       `json:"candidateCount,omitempty"`
 	Reason          string    `json:"reason,omitempty"`
 	OccurredAt      time.Time `json:"occurredAt"`
 }
@@ -219,5 +221,18 @@ func (h *PublishRealtimeHandler) OnTranscriptAnalysisReady(ctx context.Context, 
 		RepetitionCount: evt.RepetitionCount,
 		FalseStartCount: evt.FalseStartCount,
 		OccurredAt:      evt.Timestamp,
+	})
+}
+
+func (h *PublishRealtimeHandler) OnViralReady(ctx context.Context, payload []byte) error {
+	var evt domainviral.ViralReady
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionViralReady, evt.UserID, mediaFileRealtimePayload{
+		MediaFileID:    evt.MediaFileID,
+		ProjectID:      evt.ProjectID,
+		CandidateCount: evt.CandidateCount,
+		OccurredAt:     evt.Timestamp,
 	})
 }

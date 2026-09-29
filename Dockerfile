@@ -72,6 +72,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -a -installsuffix cgo \
     -ldflags="-w -s" \
+    -o viral \
+    ./cmd/viral
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -a -installsuffix cgo \
+    -ldflags="-w -s" \
     -o cli \
     ./cmd/cli
 
@@ -95,6 +101,7 @@ COPY --from=builder --chown=appuser:appuser /app/extraction .
 COPY --from=builder --chown=appuser:appuser /app/silence .
 COPY --from=builder --chown=appuser:appuser /app/transcript .
 COPY --from=builder --chown=appuser:appuser /app/analysis .
+COPY --from=builder --chown=appuser:appuser /app/viral .
 COPY --from=builder --chown=appuser:appuser /app/cli .
 
 USER appuser

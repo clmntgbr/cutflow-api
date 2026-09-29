@@ -652,15 +652,16 @@ EXTRACTION AUDIO (Opus)
 media_file.audio_ready
     ├── media_file.silence_requested  → worker silence (ffmpeg)
     └── media_file.transcript_requested → worker transcript (AssemblyAI → text + words SourceTime + SRT)
-            └── media_file.analysis_requested → worker analysis (TranscriptWord[] → fillers / répétitions / faux départs)
+            ├── media_file.analysis_requested → worker analysis (TranscriptWord[] → fillers / répétitions / faux départs)
+            └── media_file.viral_requested    → worker viral (TranscriptWord[] → ViralCandidate[] SOURCE TIME)
 ```
 
-Le worker `analysis` se lance **uniquement après** la transcription. Il ne
-dépend pas du silence / audio analysis : entrée = `TranscriptWord[]`
-seulement (pas de vidéo, pas d'audio).
+Les workers `analysis` et `viral` se lancent **en parallèle** dès la fin
+de la transcription. Aucun des deux n'attend le silence : entrée =
+`TranscriptWord[]` seulement (pas de vidéo, pas d'audio).
 
-Les `CutSegment` (montage) et `ViralClip` restent distincts et viendront
-plus tard à partir du transcript global + des silences détectés.
+Les `CutSegment` (montage) et `ViralClip` (après Timeline) restent
+distincts et viendront plus tard.
 
 ### 14.2 Extraction audio unique
 
@@ -734,23 +735,29 @@ sous-titres (plusieurs presets) et analyser les moments viraux.
 
 ### 14.4 Analyse virale globale
 
-La détection des moments viraux s'appuie sur le **transcript global**,
-pas sur des fenêtres techniques. Un passage intéressant est découpé
-sémantiquement (20–90 s) puis scoré par LLM.
+Dès `transcript.completed`, le worker `viral` charge `TranscriptWord[]`,
+formate un transcript horodaté compact, chunk si besoin (vidéos longues),
+appelle un LLM abstrait (`openai` / `deepseek`), valide le JSON, snap les
+bornes sur les mots (`BoundaryResolver`), déduplique et ranke.
 
 ``` text
-GLOBAL TRANSCRIPT
+TranscriptWord[]
        ↓
-segmentation sémantique
+LLMTranscriptFormatter
        ↓
-candidats de 20–90 s
+Semantic Chunker (si long)
        ↓
-LLM
+ViralAnalyzer (GPT / DeepSeek)
        ↓
-ViralClip[]
+Validation + BoundaryResolver
+       ↓
+Dedup / Rank
+       ↓
+ViralCandidate[] (SOURCE TIME)
 ```
 
-Les bornes des clips viraux sont donc connues avant le rendu final.
+`ViralClip` (OUTPUT TIME) vient plus tard : `ViralCandidate + Timeline`.
+Le viral-worker ne touche jamais à la vidéo.
 
 ### 14.5 Timeline comme source de vérité
 

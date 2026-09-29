@@ -19,6 +19,7 @@ const (
 	NameDetectSilence     = "detect_silence"
 	NameTranscribeAudio   = "transcribe_audio"
 	NameAnalyzeTranscript = "analyze_transcript"
+	NameAnalyzeViral      = "analyze_viral"
 )
 
 type Job struct {
