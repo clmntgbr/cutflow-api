@@ -650,7 +650,7 @@ EXTRACTION AUDIO (Opus)
     ↓
 media_file.audio_ready
     ├── media_file.silence_requested  → worker silence (ffmpeg)
-    └── media_file.transcript_requested → worker transcript (AssemblyAI → SRT → ASS)
+    └── media_file.transcript_requested → worker transcript (AssemblyAI → text + words SourceTime + SRT)
 ```
 
 Les `CutSegment` (montage) et `ViralClip` restent distincts et viendront
@@ -700,14 +700,22 @@ relancer uniquement `SilenceDetection`.
 Pas de `TranscriptSegment` / merge d'overlap : un seul job AssemblyAI
 par média produit :
 
-- `transcript.text` + `transcript_word[]` (timestamps source) ;
-- `subtitles.srt` (API AssemblyAI, fallback plat).
+- `transcript.text` + `transcript_word[]` en **SourceTime** (jamais
+  mutés quand le montage change) ;
+- `subtitles.srt` toujours généré et stocké (source-time, debug/export).
 
-L'ASS animé (highlight mot actif) n'est **pas** produit par le provider.
-Il est généré localement par le `SubtitleGenerator` à partir de
-`TranscriptWord[]` + `SubtitleStyle` (preset TikTok Classic par défaut
-aujourd'hui). Le remapping `SourceTime → OutputTime` s'appliquera plus
-tard via la Timeline avant régénération ASS au rendu.
+Le worker transcript **ne produit pas** l'ASS de rendu. L'ASS animé
+(highlight mot actif) est généré plus tard par le `SubtitleGenerator` :
+
+``` text
+TranscriptWord[] (SourceTime)
+       +
+Timeline (SourceTime → OutputTime)
+       +
+SubtitleStyle
+       ↓
+subtitles.ass (OutputTime)
+```
 
 Le transcript global sert ensuite à détecter fillers / répétitions,
 régénérer les sous-titres (plusieurs presets), et analyser les moments
@@ -1341,7 +1349,7 @@ CREATE INDEX idx_processing_job_project
 2.  Silence et ASR travaillent sur l'audio complet (pas de TechnicalSegment).
 3.  L'audio est extrait une seule fois.
 4.  Silence et transcription sont parallélisés (fan-out outbox).
-5.  Un seul transcript global par média (AssemblyAI → SRT → ASS).
+5.  Un seul transcript global par média (AssemblyAI → text + words SourceTime ; ASS après Timeline).
 6.  L'analyse virale travaille sur le transcript global.
 7.  Les moments viraux sont déterminés avant le rendu.
 8.  La Timeline est la source de vérité.

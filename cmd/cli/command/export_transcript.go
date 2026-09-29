@@ -23,7 +23,7 @@ func NewExportTranscriptCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "export-transcript",
 		Short: "Export transcript + transcript_word rows to a JSON fixture",
-		Long:  "Writes a portable JSON dump (no media/project/user IDs) plus copies SRT/ASS next to it when available in storage.",
+		Long:  "Writes a portable JSON dump (no media/project/user IDs) plus the companion source-time SRT next to it.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if mediaFileID == "" {
 				return fmt.Errorf("--media-file-id is required")
@@ -46,6 +46,9 @@ func NewExportTranscriptCommand() *cobra.Command {
 			}
 			if transcript == nil {
 				return fmt.Errorf("transcript not found for media_file_id=%s", mediaFileID)
+			}
+			if transcript.SRTStorageKey == "" {
+				return fmt.Errorf("transcript has no SRT storage key")
 			}
 			wordRows, err := repo.ListWords(context.Background(), transcript.ID)
 			if err != nil {
@@ -73,7 +76,6 @@ func NewExportTranscriptCommand() *cobra.Command {
 				},
 				Words:   words,
 				SRTFile: "subtitles.srt",
-				ASSFile: "subtitles.ass",
 			}
 
 			if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil && filepath.Dir(outPath) != "." {
@@ -83,12 +85,13 @@ func NewExportTranscriptCommand() *cobra.Command {
 				return err
 			}
 
-			// Best-effort: also dump subtitle files from storage beside the JSON.
 			store, err := storage.NewMinIOStorage(env)
-			if err == nil {
-				baseDir := filepath.Dir(outPath)
-				_ = copyStorageObject(context.Background(), store, transcript.SRTStorageKey, filepath.Join(baseDir, dump.SRTFile))
-				_ = copyStorageObject(context.Background(), store, transcript.ASSStorageKey, filepath.Join(baseDir, dump.ASSFile))
+			if err != nil {
+				return fmt.Errorf("storage: %w", err)
+			}
+			baseDir := filepath.Dir(outPath)
+			if err := copyStorageObject(context.Background(), store, transcript.SRTStorageKey, filepath.Join(baseDir, dump.SRTFile)); err != nil {
+				return fmt.Errorf("copy SRT: %w", err)
 			}
 
 			fmt.Printf("Exported transcript fixture to %s (%d words)\n", outPath, len(words))
@@ -103,21 +106,22 @@ func NewExportTranscriptCommand() *cobra.Command {
 
 func NewBuildTranscriptFixtureCommand() *cobra.Command {
 	var srtPath string
-	var assPath string
 	var outPath string
 	var language string
 
 	cmd := &cobra.Command{
 		Use:   "build-transcript-fixture",
-		Short: "Build transcript JSON fixture from local SRT (and keep ASS path)",
+		Short: "Build transcript JSON fixture from local SRT (source-time words)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			srtBytes, err := os.ReadFile(srtPath)
 			if err != nil {
 				return err
 			}
+			if len(srtBytes) == 0 {
+				return fmt.Errorf("SRT file is empty: %s", srtPath)
+			}
 			dump := fixture.BuildDumpFromSRT(string(srtBytes), language)
 			dump.SRTFile = filepath.Base(srtPath)
-			dump.ASSFile = filepath.Base(assPath)
 
 			if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil && filepath.Dir(outPath) != "." {
 				return err
@@ -126,7 +130,6 @@ func NewBuildTranscriptFixtureCommand() *cobra.Command {
 				return err
 			}
 
-			// Pretty-print size without dumping whole file to stdout.
 			info, _ := os.Stat(outPath)
 			raw, _ := json.Marshal(map[string]any{
 				"out":   outPath,
@@ -139,7 +142,6 @@ func NewBuildTranscriptFixtureCommand() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&srtPath, "srt", "subtitles.srt", "Source SRT path")
-	cmd.Flags().StringVar(&assPath, "ass", "subtitles.ass", "Companion ASS filename stored in JSON")
 	cmd.Flags().StringVar(&outPath, "out", "fixtures/transcript.json", "Output JSON path")
 	cmd.Flags().StringVar(&language, "language", "fr", "Language code")
 	return cmd

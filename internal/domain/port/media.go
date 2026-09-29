@@ -52,9 +52,8 @@ type TranscriptResult struct {
 	ProviderJobID string
 	Language      string
 	Text          string
-	SRT           string
-	// ASS, when non-empty, is uploaded as-is (fixture / pre-rendered). Otherwise the handler generates it.
-	ASS   string
+	// SRT is the source-time caption file; always produced and stored. Not used for final render ASS.
+	SRT   string
 	Words []TranscriptWord
 }
 

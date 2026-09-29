@@ -15,8 +15,8 @@ type TranscriptReady struct {
 	UserID       string    `json:"userId"`
 	Language     string    `json:"language,omitempty"`
 	WordCount    int       `json:"wordCount"`
-	SRTKey       string    `json:"srtKey"`
-	ASSKey       string    `json:"assKey"`
+	SRTKey       string    `json:"srtKey,omitempty"`
+	ASSKey       string    `json:"assKey,omitempty"`
 	Status       string    `json:"status"`
 	Timestamp    time.Time `json:"timestamp"`
 }

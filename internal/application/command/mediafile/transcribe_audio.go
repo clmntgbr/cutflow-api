@@ -3,6 +3,7 @@ package mediafile
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -12,7 +13,6 @@ import (
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
 	domaintranscript "go-api/internal/domain/transcript"
-	"go-api/internal/subtitle"
 
 	"github.com/google/uuid"
 )
@@ -109,7 +109,6 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 	}
 
 	words := make([]domaintranscript.Word, 0, len(result.Words))
-	subtitleWords := make([]subtitle.Word, 0, len(result.Words))
 	for i, word := range result.Words {
 		words = append(words, domaintranscript.Word{
 			WordIndex:     i,
@@ -119,27 +118,29 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 			Confidence:    word.Confidence,
 			Kind:          domaintranscript.KindSpeech,
 		})
-		subtitleWords = append(subtitleWords, subtitle.Word{
-			Text:    word.Text,
-			StartMs: word.StartMs,
-			EndMs:   word.EndMs,
-		})
 	}
 
-	ass := result.ASS
-	if ass == "" {
-		// Production path: generate animated ASS from words + style.
-		ass = subtitle.GenerateASS(subtitleWords, subtitle.TikTokClassic())
+	// Source-time SRT is always persisted (debug/export). Final ASS is generated
+	// later from TranscriptWord[] + Timeline (output time), not here.
+	if result.SRT == "" {
+		err := fmt.Errorf("transcription returned empty SRT")
+		log.Printf("transcription failed mediaFileId=%s: %v", cmd.MediaFileID, err)
+		if failErr := h.fail(ctx, cmd.MediaFileID, cmd.JobID, "transcription failed"); failErr != nil {
+			return failErr
+		}
+		return messaging.NonRetryable(err)
 	}
-
-	if err := h.storage.Put(ctx, transcript.SRTStorageKey, bytes.NewReader([]byte(result.SRT)), int64(len(result.SRT)), "application/x-subrip"); err != nil {
+	if err := h.storage.Put(
+		ctx,
+		transcript.SRTStorageKey,
+		bytes.NewReader([]byte(result.SRT)),
+		int64(len(result.SRT)),
+		"application/x-subrip",
+	); err != nil {
 		return messaging.Retryable(err)
 	}
-	if err := h.storage.Put(ctx, transcript.ASSStorageKey, bytes.NewReader([]byte(ass)), int64(len(ass)), "text/x-ass"); err != nil {
-		return messaging.Retryable(err)
-	}
 
-	return h.complete(ctx, cmd.MediaFileID, cmd.JobID, result.ProviderJobID, result.Language, result.Text, words)
+	return h.complete(ctx, cmd.MediaFileID, cmd.JobID, result.ProviderJobID, result.Language, result.Text, words, transcript.SRTStorageKey)
 }
 
 func (h *TranscribeAudioHandler) markProcessing(ctx context.Context, jobID uuid.UUID) error {
@@ -187,6 +188,7 @@ func (h *TranscribeAudioHandler) complete(
 	mediaFileID, jobID uuid.UUID,
 	providerJobID, language, text string,
 	words []domaintranscript.Word,
+	srtKey string,
 ) error {
 	return h.transcriptRepo.WithTransaction(ctx, func(txCtx context.Context) error {
 		transcript, err := h.transcriptRepo.GetByMediaFileID(txCtx, mediaFileID)
@@ -202,7 +204,8 @@ func (h *TranscribeAudioHandler) complete(
 		if providerJobID != "" {
 			transcript.MarkProcessing(providerJobID)
 		}
-		transcript.MarkCompleted(language, text, transcript.SRTStorageKey, transcript.ASSStorageKey, words)
+		// ASS is not produced by the transcript worker (timeline remapping comes later).
+		transcript.MarkCompleted(language, text, srtKey, "", words)
 		if err := h.transcriptRepo.Update(txCtx, transcript); err != nil {
 			return messaging.Retryable(err)
 		}

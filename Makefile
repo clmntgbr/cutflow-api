@@ -77,8 +77,7 @@ purge-storage: cli-build
 
 build-transcript-fixture: cli-build
 	@$(COMPOSE_DEV) exec api ./bin/cli build-transcript-fixture \
-		--srt=subtitles.srt \
-		--ass=subtitles.ass \
+		--srt=fixtures/subtitles.srt \
 		--out=fixtures/transcript.json \
 		--language=fr
 

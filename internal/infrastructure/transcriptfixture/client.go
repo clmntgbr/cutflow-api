@@ -9,7 +9,7 @@ import (
 	"go-api/internal/domain/port"
 )
 
-// Client loads a JSON dump (transcript + transcript_words) and companion SRT/ASS files.
+// Client loads a JSON dump (transcript + transcript_words) and companion source-time SRT.
 type Client struct {
 	jsonPath string
 }
@@ -22,25 +22,6 @@ func (c *Client) Transcribe(_ context.Context, _ string) (port.TranscriptResult,
 	dump, err := LoadDump(c.jsonPath)
 	if err != nil {
 		return port.TranscriptResult{}, err
-	}
-
-	baseDir := filepath.Dir(c.jsonPath)
-	srtPath := dump.SRTFile
-	assPath := dump.ASSFile
-	if !filepath.IsAbs(srtPath) {
-		srtPath = filepath.Join(baseDir, srtPath)
-	}
-	if !filepath.IsAbs(assPath) {
-		assPath = filepath.Join(baseDir, assPath)
-	}
-
-	srtBytes, err := os.ReadFile(srtPath)
-	if err != nil {
-		return port.TranscriptResult{}, fmt.Errorf("read fixture srt %s: %w", srtPath, err)
-	}
-	assBytes, err := os.ReadFile(assPath)
-	if err != nil {
-		return port.TranscriptResult{}, fmt.Errorf("read fixture ass %s: %w", assPath, err)
 	}
 
 	words := make([]port.TranscriptWord, 0, len(dump.Words))
@@ -57,12 +38,26 @@ func (c *Client) Transcribe(_ context.Context, _ string) (port.TranscriptResult,
 		words = append(words, word)
 	}
 
+	if dump.SRTFile == "" {
+		return port.TranscriptResult{}, fmt.Errorf("fixture dump missing srt_file")
+	}
+	srtPath := dump.SRTFile
+	if !filepath.IsAbs(srtPath) {
+		srtPath = filepath.Join(filepath.Dir(c.jsonPath), srtPath)
+	}
+	srtBytes, err := os.ReadFile(srtPath)
+	if err != nil {
+		return port.TranscriptResult{}, fmt.Errorf("read fixture srt %s: %w", srtPath, err)
+	}
+	if len(srtBytes) == 0 {
+		return port.TranscriptResult{}, fmt.Errorf("fixture srt %s is empty", srtPath)
+	}
+
 	return port.TranscriptResult{
 		ProviderJobID: dump.Transcript.ProviderJobID,
 		Language:      dump.Transcript.Language,
 		Text:          dump.Transcript.Text,
 		SRT:           string(srtBytes),
-		ASS:           string(assBytes),
 		Words:         words,
 	}, nil
 }

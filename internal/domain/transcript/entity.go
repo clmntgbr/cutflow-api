@@ -59,7 +59,8 @@ func NewPending(mediaFileID, projectID, userID uuid.UUID) *Transcript {
 		ProjectID:     projectID,
 		UserID:        userID,
 		SRTStorageKey: NewSRTStorageKey(mediaFileID),
-		ASSStorageKey: NewASSStorageKey(mediaFileID),
+		// ASS is produced later by SubtitleGenerator after Timeline remapping.
+		ASSStorageKey: "",
 		Status:        StatusPending,
 		CreatedAt:     now,
 		UpdatedAt:     now,

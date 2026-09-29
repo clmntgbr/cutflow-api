@@ -10,9 +10,8 @@ import (
 type Dump struct {
 	Transcript TranscriptRow `json:"transcript"`
 	Words      []WordRow     `json:"transcript_words"`
-	// Relative paths next to the JSON file (optional; defaults to subtitles.srt / subtitles.ass).
-	SRTFile string `json:"srt_file,omitempty"`
-	ASSFile string `json:"ass_file,omitempty"`
+	// Companion source-time SRT (relative to the JSON file). Always required.
+	SRTFile string `json:"srt_file"`
 }
 
 type TranscriptRow struct {
@@ -49,9 +48,6 @@ func LoadDump(path string) (*Dump, error) {
 	if dump.SRTFile == "" {
 		dump.SRTFile = "subtitles.srt"
 	}
-	if dump.ASSFile == "" {
-		dump.ASSFile = "subtitles.ass"
-	}
 	return &dump, nil
 }
 
@@ -86,6 +82,5 @@ func BuildDumpFromSRT(srt string, language string) *Dump {
 		},
 		Words:   rows,
 		SRTFile: "subtitles.srt",
-		ASSFile: "subtitles.ass",
 	}
 }
