@@ -2,6 +2,7 @@ package read
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -69,6 +70,47 @@ type projectJobRow struct {
 }
 
 func (projectJobRow) TableName() string { return "job" }
+
+type projectTimelineRow struct {
+	ID            uuid.UUID
+	MediaFileID   uuid.UUID `gorm:"column:media_file_id"`
+	Version       int
+	DurationMs    int64     `gorm:"column:duration_ms"`
+	Fingerprint   string
+	EngineVersion string    `gorm:"column:engine_version"`
+	IsActive      bool      `gorm:"column:is_active"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (projectTimelineRow) TableName() string { return "timeline" }
+
+type projectTimelineSegmentRow struct {
+	TimelineID    uuid.UUID `gorm:"column:timeline_id"`
+	MediaFileID   uuid.UUID `gorm:"column:media_file_id"`
+	SegmentIndex  int       `gorm:"column:segment_index"`
+	SourceStartMs int64     `gorm:"column:source_start_ms"`
+	SourceEndMs   int64     `gorm:"column:source_end_ms"`
+	OutputStartMs int64     `gorm:"column:output_start_ms"`
+	OutputEndMs   int64     `gorm:"column:output_end_ms"`
+}
+
+func (projectTimelineSegmentRow) TableName() string { return "timeline_segment" }
+
+type projectEditDecisionRow struct {
+	ID            uuid.UUID
+	TimelineID    *uuid.UUID      `gorm:"column:timeline_id"`
+	MediaFileID   uuid.UUID       `gorm:"column:media_file_id"`
+	DecisionType  string          `gorm:"column:decision_type"`
+	SourceStartMs int64           `gorm:"column:source_start_ms"`
+	SourceEndMs   int64           `gorm:"column:source_end_ms"`
+	Action        string
+	Source        string
+	Confidence    *float64
+	Reasons       json.RawMessage `gorm:"column:reasons;type:jsonb"`
+}
+
+func (projectEditDecisionRow) TableName() string { return "edit_decision" }
 
 var projectListSortColumns = map[string]string{
 	"created_at": "project.created_at",
@@ -184,6 +226,11 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 		jobs = append(jobs, projectJobViewFromRow(job))
 	}
 
+	timelines, err := r.loadActiveTimelines(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
 	return &domainproject.ProjectDetailView{
 		ID:         row.ID,
 		Name:       row.Name,
@@ -192,7 +239,136 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 		UpdatedAt:  row.UpdatedAt,
 		MediaFiles: mediaFiles,
 		Jobs:       jobs,
+		Timelines:  timelines,
 	}, nil
+}
+
+func (r *projectReadRepository) loadActiveTimelines(
+	ctx context.Context,
+	projectID uuid.UUID,
+) ([]domainproject.ProjectTimelineView, error) {
+	var timelineRows []projectTimelineRow
+	err := r.db.WithContext(ctx).
+		Select(
+			"id",
+			"media_file_id",
+			"version",
+			"duration_ms",
+			"fingerprint",
+			"engine_version",
+			"is_active",
+			"created_at",
+			"updated_at",
+		).
+		Where("project_id = ? AND is_active = TRUE", projectID).
+		Order("created_at ASC").
+		Find(&timelineRows).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(timelineRows) == 0 {
+		return []domainproject.ProjectTimelineView{}, nil
+	}
+
+	timelineIDs := make([]uuid.UUID, len(timelineRows))
+	indexByID := make(map[uuid.UUID]int, len(timelineRows))
+	timelines := make([]domainproject.ProjectTimelineView, 0, len(timelineRows))
+	for i, row := range timelineRows {
+		timelineIDs[i] = row.ID
+		indexByID[row.ID] = i
+		timelines = append(timelines, domainproject.ProjectTimelineView{
+			ID:            row.ID,
+			MediaFileID:   row.MediaFileID,
+			Version:       row.Version,
+			DurationMs:    row.DurationMs,
+			Fingerprint:   row.Fingerprint,
+			EngineVersion: row.EngineVersion,
+			IsActive:      row.IsActive,
+			Segments:      []domainproject.ProjectTimelineSegmentView{},
+			Decisions:     []domainproject.ProjectEditDecisionView{},
+			CreatedAt:     row.CreatedAt,
+			UpdatedAt:     row.UpdatedAt,
+		})
+	}
+
+	var segmentRows []projectTimelineSegmentRow
+	err = r.db.WithContext(ctx).
+		Select(
+			"timeline_id",
+			"media_file_id",
+			"segment_index",
+			"source_start_ms",
+			"source_end_ms",
+			"output_start_ms",
+			"output_end_ms",
+		).
+		Where("timeline_id IN ?", timelineIDs).
+		Order("timeline_id ASC, segment_index ASC").
+		Find(&segmentRows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, seg := range segmentRows {
+		idx, ok := indexByID[seg.TimelineID]
+		if !ok {
+			continue
+		}
+		timelines[idx].Segments = append(timelines[idx].Segments, domainproject.ProjectTimelineSegmentView{
+			Index:         seg.SegmentIndex,
+			MediaFileID:   seg.MediaFileID,
+			SourceStartMs: seg.SourceStartMs,
+			SourceEndMs:   seg.SourceEndMs,
+			OutputStartMs: seg.OutputStartMs,
+			OutputEndMs:   seg.OutputEndMs,
+		})
+	}
+
+	var decisionRows []projectEditDecisionRow
+	err = r.db.WithContext(ctx).
+		Select(
+			"id",
+			"timeline_id",
+			"media_file_id",
+			"decision_type",
+			"source_start_ms",
+			"source_end_ms",
+			"action",
+			"source",
+			"confidence",
+			"reasons",
+		).
+		Where("timeline_id IN ?", timelineIDs).
+		Order("timeline_id ASC, source_start_ms ASC").
+		Find(&decisionRows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, dec := range decisionRows {
+		if dec.TimelineID == nil {
+			continue
+		}
+		idx, ok := indexByID[*dec.TimelineID]
+		if !ok {
+			continue
+		}
+		reasons := make([]string, 0)
+		if len(dec.Reasons) > 0 {
+			_ = json.Unmarshal(dec.Reasons, &reasons)
+		}
+		timelines[idx].Decisions = append(timelines[idx].Decisions, domainproject.ProjectEditDecisionView{
+			ID:            dec.ID,
+			MediaFileID:   dec.MediaFileID,
+			Type:          dec.DecisionType,
+			SourceStartMs: dec.SourceStartMs,
+			SourceEndMs:   dec.SourceEndMs,
+			Action:        dec.Action,
+			Source:        dec.Source,
+			Confidence:    dec.Confidence,
+			Reasons:       reasons,
+		})
+	}
+
+	return timelines, nil
 }
 
 func (r *projectReadRepository) List(

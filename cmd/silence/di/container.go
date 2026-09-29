@@ -47,6 +47,8 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	detectHandler := cmdmediafile.NewDetectSilenceHandler(
 		write.NewDetectedSilenceWriteRepository(db),
 		write.NewMediaConfigurationWriteRepository(db),
+		write.NewMediaFileWriteRepository(db),
+		write.NewTimelineWriteRepository(db),
 		write.NewJobWriteRepository(db),
 		minioStorage,
 		inframedia.NewSilenceDetector(),

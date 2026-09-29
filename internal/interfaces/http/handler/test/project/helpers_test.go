@@ -154,6 +154,49 @@ func sampleProjectDetailView() *domainproject.ProjectDetailView {
 				StartedAt:   &startedAt,
 			},
 		},
+		Timelines: []domainproject.ProjectTimelineView{
+			{
+				ID:            testutil.TestTimelineID,
+				MediaFileID:   testutil.TestMediaFileID,
+				Version:       1,
+				DurationMs:    4200,
+				Fingerprint:   "abc123",
+				EngineVersion: "timeline-engine-v1",
+				IsActive:      true,
+				Segments: []domainproject.ProjectTimelineSegmentView{
+					{
+						Index:         0,
+						MediaFileID:   testutil.TestMediaFileID,
+						SourceStartMs: 0,
+						SourceEndMs:   2000,
+						OutputStartMs: 0,
+						OutputEndMs:   2000,
+					},
+					{
+						Index:         1,
+						MediaFileID:   testutil.TestMediaFileID,
+						SourceStartMs: 2800,
+						SourceEndMs:   5000,
+						OutputStartMs: 2000,
+						OutputEndMs:   4200,
+					},
+				},
+				Decisions: []domainproject.ProjectEditDecisionView{
+					{
+						ID:            uuid.MustParse("01960000-0000-7000-8000-000000000006"),
+						MediaFileID:   testutil.TestMediaFileID,
+						Type:          "silence",
+						SourceStartMs: 2000,
+						SourceEndMs:   2800,
+						Action:        "remove",
+						Source:        "automatic",
+						Reasons:       []string{"silence"},
+					},
+				},
+				CreatedAt: time.Date(2026, 9, 28, 10, 10, 0, 0, time.UTC),
+				UpdatedAt: time.Date(2026, 9, 28, 10, 10, 0, 0, time.UTC),
+			},
+		},
 	}
 }
 

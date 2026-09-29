@@ -40,22 +40,35 @@
 │ faux départs  │  │ (non bloquant) │             │
 └───────┬───────┘  └────────────────┘             │
         │                                         │
-        └─────────────────┬───────────────────────┘
-                          ▼
+        │              ┌──────────────────────────┘
+        │              │
+        ▼              ▼
 ┌──────────────────────────────────────────────┐
-│ 6. TIMELINE WORKER                           │
+│ BARRIER (initial only)                       │
+│                                              │
+│ wait silence ✓ AND text-analysis ✓           │
+│ viral n'est PAS dans la barrière             │
+│                                              │
+│ → timeline_rebuild_requested                 │
+│   reason=initial_analysis_ready              │
+└──────────────────────┬───────────────────────┘
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 6. TIMELINE WORKER → Timeline V1             │
 │                                              │
 │ DetectedSilence[]                            │
 │ DetectedTranscriptIssue[]                    │
 │ MediaConfiguration                           │
 │ UserOverride[]                               │
 │       ↓                                      │
-│ EditDecision[]                               │
+│ EditDecision[] → Timeline                    │
 │       ↓                                      │
-│ Timeline + TimelineSegment[]                 │
-│ (SOURCE ↔ OUTPUT)                            │
-│       ↓                                      │
-│ timeline.updated                             │
-│       ↓                                      │
-│ READY_TO_EDIT / Preview                      │
+│ READY_TO_EDIT                                │
+└──────────────────────┬───────────────────────┘
+                       ▼
+┌──────────────────────────────────────────────┐
+│ AFTER INITIAL: rebuild immédiat              │
+│                                              │
+│ config / override / re-analyse               │
+│ → V2, V3, V4…                                │
 └──────────────────────────────────────────────┘

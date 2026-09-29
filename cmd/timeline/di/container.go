@@ -39,6 +39,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	dedupRepo := processed.NewRepository(db)
 	rebuildHandler := cmdmediafile.NewRebuildTimelineHandler(
 		write.NewMediaFileWriteRepository(db),
+		write.NewProjectWriteRepository(db),
 		write.NewMediaConfigurationWriteRepository(db),
 		write.NewDetectedSilenceWriteRepository(db),
 		write.NewDetectedTranscriptIssueWriteRepository(db),

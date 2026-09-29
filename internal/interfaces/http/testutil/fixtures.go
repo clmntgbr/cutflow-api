@@ -8,5 +8,6 @@ var (
 	TestProjectID   = uuid.MustParse("01960000-0000-7000-8000-000000000002")
 	TestMediaFileID = uuid.MustParse("01960000-0000-7000-8000-000000000003")
 	TestJobID       = uuid.MustParse("01960000-0000-7000-8000-000000000004")
+	TestTimelineID  = uuid.MustParse("01960000-0000-7000-8000-000000000005")
 )
 

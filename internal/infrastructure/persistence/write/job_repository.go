@@ -48,3 +48,16 @@ func (r *jobWriteRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain
 	}
 	return jobDomainFromModel(&model), nil
 }
+
+func (r *jobWriteRepository) HasSuccessful(ctx context.Context, mediaFileID uuid.UUID, name string) (bool, error) {
+	var count int64
+	err := DBWithContext(ctx, r.db).
+		Model(&JobModel{}).
+		Where("media_file_id = ? AND name = ? AND status = ?", mediaFileID, name, domainjob.StatusSuccess).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

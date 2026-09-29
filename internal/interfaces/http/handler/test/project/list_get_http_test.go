@@ -229,6 +229,25 @@ func TestProjectHandler_GetByID_Success(t *testing.T) {
 	if out.Jobs[0].MediaFileID != testutil.TestMediaFileID.String() {
 		t.Fatalf("job mediaFileId: got %s", out.Jobs[0].MediaFileID)
 	}
+	if len(out.Timelines) != 1 {
+		t.Fatalf("timelines: got %d", len(out.Timelines))
+	}
+	tl := out.Timelines[0]
+	if tl.ID != testutil.TestTimelineID.String() {
+		t.Fatalf("timeline id: got %s", tl.ID)
+	}
+	if tl.Version != 1 || tl.DurationMs != 4200 {
+		t.Fatalf("timeline version/duration: got %d/%d", tl.Version, tl.DurationMs)
+	}
+	if len(tl.Segments) != 2 {
+		t.Fatalf("segments: got %d", len(tl.Segments))
+	}
+	if len(tl.Decisions) != 1 {
+		t.Fatalf("decisions: got %d", len(tl.Decisions))
+	}
+	if tl.Decisions[0].Type != "silence" || tl.Decisions[0].Action != "remove" {
+		t.Fatalf("decision: got type=%s action=%s", tl.Decisions[0].Type, tl.Decisions[0].Action)
+	}
 }
 
 func TestProjectHandler_GetByID_Unauthorized(t *testing.T) {

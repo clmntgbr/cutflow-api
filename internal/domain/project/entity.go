@@ -98,3 +98,27 @@ func (p *Project) MarkProcessing() error {
 		return ErrInvalidTransition
 	}
 }
+
+// MarkReady moves a processing project to ready once the initial timeline is built.
+// Already-ready (and later) statuses are no-ops so rebuild retries stay idempotent.
+func (p *Project) MarkReady() error {
+	switch p.Status {
+	case StatusProcessing, StatusDraft:
+		now := time.Now().UTC()
+		p.Status = StatusReady
+		p.UpdatedAt = now
+		p.recordEvent(ProjectUpdated{
+			ID:        uuid.New().String(),
+			ProjectID: p.ID.String(),
+			UserID:    p.UserID.String(),
+			Name:      p.Name,
+			Status:    p.Status,
+			Timestamp: now,
+		})
+		return nil
+	case StatusReady, StatusRendering, StatusCompleted, StatusFailed:
+		return nil
+	default:
+		return ErrInvalidTransition
+	}
+}

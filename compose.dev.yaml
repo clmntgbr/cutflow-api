@@ -71,7 +71,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: extraction
+    container_name: extraction-worker
     command: ["go", "run", "./cmd/extraction"]
     volumes:
       - .:/app
@@ -97,7 +97,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: silence
+    container_name: silence-worker
     command: ["go", "run", "./cmd/silence"]
     volumes:
       - .:/app
@@ -125,7 +125,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: transcript
+    container_name: transcript-worker
     command: ["go", "run", "./cmd/transcript"]
     volumes:
       - .:/app
@@ -154,7 +154,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: analysis
+    container_name: analysis-worker
     command: ["go", "run", "./cmd/analysis"]
     volumes:
       - .:/app
@@ -180,7 +180,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: viral
+    container_name: viral-worker
     command: ["go", "run", "./cmd/viral"]
     volumes:
       - .:/app
@@ -214,7 +214,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
-    container_name: timeline
+    container_name: timeline-worker
     command: ["go", "run", "./cmd/timeline"]
     volumes:
       - .:/app

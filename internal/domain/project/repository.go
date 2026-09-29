@@ -40,6 +40,7 @@ type ProjectDetailView struct {
 	UpdatedAt  time.Time
 	MediaFiles []ProjectMediaFileView
 	Jobs       []ProjectJobView
+	Timelines  []ProjectTimelineView
 }
 
 type ProjectMediaFileView struct {
@@ -72,4 +73,39 @@ type ProjectJobView struct {
 	UpdatedAt    time.Time
 	StartedAt    *time.Time
 	CompletedAt  *time.Time
+}
+
+type ProjectTimelineView struct {
+	ID            uuid.UUID
+	MediaFileID   uuid.UUID
+	Version       int
+	DurationMs    int64
+	Fingerprint   string
+	EngineVersion string
+	IsActive      bool
+	Segments      []ProjectTimelineSegmentView
+	Decisions     []ProjectEditDecisionView
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type ProjectTimelineSegmentView struct {
+	Index         int
+	MediaFileID   uuid.UUID
+	SourceStartMs int64
+	SourceEndMs   int64
+	OutputStartMs int64
+	OutputEndMs   int64
+}
+
+type ProjectEditDecisionView struct {
+	ID            uuid.UUID
+	MediaFileID   uuid.UUID
+	Type          string
+	SourceStartMs int64
+	SourceEndMs   int64
+	Action        string
+	Source        string
+	Confidence    *float64
+	Reasons       []string
 }

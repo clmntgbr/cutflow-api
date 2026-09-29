@@ -30,6 +30,8 @@ type AnalyzeTranscriptHandler struct {
 	transcriptRepo domaintranscript.TranscriptWriteRepository
 	issueRepo      domaintranscriptissue.IssueWriteRepository
 	configRepo     domainmediaconfig.MediaConfigurationWriteRepository
+	mediaRepo      domainmediafile.MediaFileWriteRepository
+	timelineRepo   domaintimeline.TimelineWriteRepository
 	jobRepo        domainjob.JobWriteRepository
 	outbox         port.OutboxRepository
 }
@@ -38,6 +40,8 @@ func NewAnalyzeTranscriptHandler(
 	transcriptRepo domaintranscript.TranscriptWriteRepository,
 	issueRepo domaintranscriptissue.IssueWriteRepository,
 	configRepo domainmediaconfig.MediaConfigurationWriteRepository,
+	mediaRepo domainmediafile.MediaFileWriteRepository,
+	timelineRepo domaintimeline.TimelineWriteRepository,
 	jobRepo domainjob.JobWriteRepository,
 	outbox port.OutboxRepository,
 ) *AnalyzeTranscriptHandler {
@@ -45,6 +49,8 @@ func NewAnalyzeTranscriptHandler(
 		transcriptRepo: transcriptRepo,
 		issueRepo:      issueRepo,
 		configRepo:     configRepo,
+		mediaRepo:      mediaRepo,
+		timelineRepo:   timelineRepo,
 		jobRepo:        jobRepo,
 		outbox:         outbox,
 	}
@@ -60,7 +66,19 @@ func (h *AnalyzeTranscriptHandler) Handle(ctx context.Context, cmd AnalyzeTransc
 		return messaging.Retryable(err)
 	}
 	if existing > 0 {
-		return h.markJobSuccess(ctx, cmd.JobID)
+		return h.issueRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+			events := make([]event.DomainEvent, 0, 4)
+			if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
+				return err
+			}
+			if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "transcript_analysis_ready"); err != nil {
+				return err
+			}
+			if len(events) == 0 {
+				return nil
+			}
+			return h.outbox.StoreEvents(txCtx, events)
+		})
 	}
 
 	transcript, err := h.transcriptRepo.GetByMediaFileID(ctx, cmd.MediaFileID)
@@ -144,8 +162,18 @@ func (h *AnalyzeTranscriptHandler) persist(
 		if err != nil {
 			return messaging.Retryable(err)
 		}
+		events := make([]event.DomainEvent, 0, 4)
 		if count > 0 {
-			return h.markJobSuccessInTx(txCtx, cmd.JobID)
+			if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
+				return err
+			}
+			if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "transcript_analysis_ready"); err != nil {
+				return err
+			}
+			if len(events) == 0 {
+				return nil
+			}
+			return h.outbox.StoreEvents(txCtx, events)
 		}
 
 		if err := h.issueRepo.ReplaceForMediaFile(txCtx, cmd.MediaFileID, issues); err != nil {
@@ -155,50 +183,52 @@ func (h *AnalyzeTranscriptHandler) persist(
 			return messaging.Retryable(err)
 		}
 
-		events := []event.DomainEvent{
-			domaintranscriptissue.TranscriptAnalysisReady{
-				ID:              uuid.New().String(),
-				MediaFileID:     cmd.MediaFileID.String(),
-				ProjectID:       cmd.ProjectID.String(),
-				UserID:          cmd.UserID.String(),
-				TranscriptID:    transcriptID.String(),
-				FillerCount:     countType(issues, domaintranscriptissue.TypeFiller),
-				RepetitionCount: countType(issues, domaintranscriptissue.TypeRepetition),
-				FalseStartCount: countType(issues, domaintranscriptissue.TypeFalseStart),
-				Timestamp:       time.Now().UTC(),
-			},
-		}
-		if cmd.JobID != uuid.Nil {
-			job, err := h.jobRepo.GetByID(txCtx, cmd.JobID)
-			if err != nil {
-				return messaging.Retryable(err)
-			}
-			if job != nil && job.Status != domainjob.StatusSuccess {
-				job.MarkSuccess()
-				if err := h.jobRepo.Update(txCtx, job); err != nil {
-					return messaging.Retryable(err)
-				}
-				events = append(events, job.PullEvents()...)
-			}
-		}
-
-		timelineJob := domainjob.New(cmd.ProjectID, cmd.MediaFileID, cmd.UserID, domainjob.NameRebuildTimeline)
-		if err := h.jobRepo.Save(txCtx, timelineJob); err != nil {
-			return messaging.Retryable(err)
-		}
-		events = append(events, timelineJob.PullEvents()...)
-		events = append(events, domaintimeline.RebuildRequested{
-			ID:          uuid.New().String(),
-			MediaFileID: cmd.MediaFileID.String(),
-			ProjectID:   cmd.ProjectID.String(),
-			UserID:      cmd.UserID.String(),
-			JobID:       timelineJob.ID.String(),
-			Reason:      "transcript_analysis_ready",
-			Timestamp:   time.Now().UTC(),
+		events = append(events, domaintranscriptissue.TranscriptAnalysisReady{
+			ID:              uuid.New().String(),
+			MediaFileID:     cmd.MediaFileID.String(),
+			ProjectID:       cmd.ProjectID.String(),
+			UserID:          cmd.UserID.String(),
+			TranscriptID:    transcriptID.String(),
+			FillerCount:     countType(issues, domaintranscriptissue.TypeFiller),
+			RepetitionCount: countType(issues, domaintranscriptissue.TypeRepetition),
+			FalseStartCount: countType(issues, domaintranscriptissue.TypeFalseStart),
+			Timestamp:       time.Now().UTC(),
 		})
-
+		if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
+			return err
+		}
+		if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "transcript_analysis_ready"); err != nil {
+			return err
+		}
 		return h.outbox.StoreEvents(txCtx, events)
 	})
+}
+
+func (h *AnalyzeTranscriptHandler) timelineDeps() timelineRebuildDeps {
+	return timelineRebuildDeps{
+		mediaRepo:    h.mediaRepo,
+		jobRepo:      h.jobRepo,
+		timelineRepo: h.timelineRepo,
+	}
+}
+
+func (h *AnalyzeTranscriptHandler) markJobSuccessEvents(ctx context.Context, jobID uuid.UUID, events *[]event.DomainEvent) error {
+	if jobID == uuid.Nil {
+		return nil
+	}
+	job, err := h.jobRepo.GetByID(ctx, jobID)
+	if err != nil {
+		return messaging.Retryable(err)
+	}
+	if job == nil || job.Status == domainjob.StatusSuccess {
+		return nil
+	}
+	job.MarkSuccess()
+	if err := h.jobRepo.Update(ctx, job); err != nil {
+		return messaging.Retryable(err)
+	}
+	*events = append(*events, job.PullEvents()...)
+	return nil
 }
 
 func (h *AnalyzeTranscriptHandler) markProcessing(ctx context.Context, jobID uuid.UUID) error {
@@ -219,30 +249,6 @@ func (h *AnalyzeTranscriptHandler) markProcessing(ctx context.Context, jobID uui
 		}
 		return h.outbox.StoreEvents(txCtx, job.PullEvents())
 	})
-}
-
-func (h *AnalyzeTranscriptHandler) markJobSuccess(ctx context.Context, jobID uuid.UUID) error {
-	return h.jobRepo.WithTransaction(ctx, func(txCtx context.Context) error {
-		return h.markJobSuccessInTx(txCtx, jobID)
-	})
-}
-
-func (h *AnalyzeTranscriptHandler) markJobSuccessInTx(ctx context.Context, jobID uuid.UUID) error {
-	if jobID == uuid.Nil {
-		return nil
-	}
-	job, err := h.jobRepo.GetByID(ctx, jobID)
-	if err != nil {
-		return messaging.Retryable(err)
-	}
-	if job == nil || job.Status == domainjob.StatusSuccess {
-		return nil
-	}
-	job.MarkSuccess()
-	if err := h.jobRepo.Update(ctx, job); err != nil {
-		return messaging.Retryable(err)
-	}
-	return h.outbox.StoreEvents(ctx, job.PullEvents())
 }
 
 func (h *AnalyzeTranscriptHandler) fail(ctx context.Context, jobID uuid.UUID, reason string) error {

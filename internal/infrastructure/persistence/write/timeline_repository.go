@@ -51,6 +51,19 @@ func (r *timelineWriteRepository) FindByFingerprint(ctx context.Context, mediaFi
 	return r.loadTimeline(ctx, &m)
 }
 
+func (r *timelineWriteRepository) ExistsByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) (bool, error) {
+	var count int64
+	err := DBWithContext(ctx, r.db).
+		Model(&TimelineModel{}).
+		Where("media_file_id = ?", mediaFileID).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (r *timelineWriteRepository) NextVersion(ctx context.Context, mediaFileID uuid.UUID) (int, error) {
 	db := DBWithContext(ctx, r.db)
 	var max *int

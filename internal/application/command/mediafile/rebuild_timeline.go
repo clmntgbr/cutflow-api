@@ -11,6 +11,7 @@ import (
 	domainmediaconfig "go-api/internal/domain/mediaconfig"
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
+	domainproject "go-api/internal/domain/project"
 	domainsilence "go-api/internal/domain/silence"
 	domaintimeline "go-api/internal/domain/timeline"
 	domaintranscriptissue "go-api/internal/domain/transcriptissue"
@@ -31,18 +32,20 @@ type UserOverrideLister interface {
 }
 
 type RebuildTimelineHandler struct {
-	mediaRepo     domainmediafile.MediaFileWriteRepository
-	configRepo    domainmediaconfig.MediaConfigurationWriteRepository
-	silenceRepo   domainsilence.DetectedSilenceWriteRepository
-	issueRepo     domaintranscriptissue.IssueWriteRepository
-	overrideRepo  UserOverrideLister
-	timelineRepo  domaintimeline.TimelineWriteRepository
-	jobRepo       domainjob.JobWriteRepository
-	outbox        port.OutboxRepository
+	mediaRepo    domainmediafile.MediaFileWriteRepository
+	projectRepo  domainproject.ProjectWriteRepository
+	configRepo   domainmediaconfig.MediaConfigurationWriteRepository
+	silenceRepo  domainsilence.DetectedSilenceWriteRepository
+	issueRepo    domaintranscriptissue.IssueWriteRepository
+	overrideRepo UserOverrideLister
+	timelineRepo domaintimeline.TimelineWriteRepository
+	jobRepo      domainjob.JobWriteRepository
+	outbox       port.OutboxRepository
 }
 
 func NewRebuildTimelineHandler(
 	mediaRepo domainmediafile.MediaFileWriteRepository,
+	projectRepo domainproject.ProjectWriteRepository,
 	configRepo domainmediaconfig.MediaConfigurationWriteRepository,
 	silenceRepo domainsilence.DetectedSilenceWriteRepository,
 	issueRepo domaintranscriptissue.IssueWriteRepository,
@@ -53,6 +56,7 @@ func NewRebuildTimelineHandler(
 ) *RebuildTimelineHandler {
 	return &RebuildTimelineHandler{
 		mediaRepo:    mediaRepo,
+		projectRepo:  projectRepo,
 		configRepo:   configRepo,
 		silenceRepo:  silenceRepo,
 		issueRepo:    issueRepo,
@@ -210,6 +214,9 @@ func (h *RebuildTimelineHandler) persist(ctx context.Context, cmd RebuildTimelin
 				Timestamp:   time.Now().UTC(),
 			},
 		}
+		if err := h.markProjectReadyInTx(txCtx, cmd.ProjectID, &events); err != nil {
+			return err
+		}
 		if err := h.succeedJobInTx(txCtx, cmd.JobID, &events); err != nil {
 			return err
 		}
@@ -237,10 +244,43 @@ func (h *RebuildTimelineHandler) reuseInTx(ctx context.Context, cmd RebuildTimel
 			Timestamp:   time.Now().UTC(),
 		},
 	}
+	if err := h.markProjectReadyInTx(ctx, cmd.ProjectID, &events); err != nil {
+		return err
+	}
 	if err := h.succeedJobInTx(ctx, cmd.JobID, &events); err != nil {
 		return err
 	}
 	return h.outbox.StoreEvents(ctx, events)
+}
+
+func (h *RebuildTimelineHandler) markProjectReadyInTx(
+	ctx context.Context,
+	projectID uuid.UUID,
+	events *[]event.DomainEvent,
+) error {
+	if projectID == uuid.Nil {
+		return nil
+	}
+	project, err := h.projectRepo.GetByID(ctx, projectID)
+	if err != nil {
+		return messaging.Retryable(err)
+	}
+	if project == nil {
+		return nil
+	}
+	if err := project.MarkReady(); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	projectEvents := project.PullEvents()
+	if len(projectEvents) == 0 {
+		return nil
+	}
+	if err := h.projectRepo.Update(ctx, project); err != nil {
+		return messaging.Retryable(err)
+	}
+	*events = append(*events, projectEvents...)
+	log.Printf("project marked ready projectId=%s", project.ID)
+	return nil
 }
 
 func (h *RebuildTimelineHandler) succeedJobInTx(ctx context.Context, jobID uuid.UUID, events *[]event.DomainEvent) error {

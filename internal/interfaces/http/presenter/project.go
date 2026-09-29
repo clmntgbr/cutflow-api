@@ -56,6 +56,7 @@ type ProjectDetailResponse struct {
 	UpdatedAt  time.Time                  `json:"updatedAt"`
 	MediaFiles []ProjectMediaFileResponse `json:"mediaFiles"`
 	Jobs       []ProjectJobResponse       `json:"jobs"`
+	Timelines  []ProjectTimelineResponse  `json:"timelines"`
 }
 
 type ProjectMediaFileResponse struct {
@@ -89,6 +90,41 @@ type ProjectJobResponse struct {
 	CompletedAt  *time.Time `json:"completedAt"`
 }
 
+type ProjectTimelineResponse struct {
+	ID            string                           `json:"id"`
+	MediaFileID   string                           `json:"mediaFileId"`
+	Version       int                              `json:"version"`
+	DurationMs    int64                            `json:"durationMs"`
+	Fingerprint   string                           `json:"fingerprint"`
+	EngineVersion string                           `json:"engineVersion"`
+	IsActive      bool                             `json:"isActive"`
+	Segments      []ProjectTimelineSegmentResponse `json:"segments"`
+	Decisions     []ProjectEditDecisionResponse    `json:"decisions"`
+	CreatedAt     time.Time                        `json:"createdAt"`
+	UpdatedAt     time.Time                        `json:"updatedAt"`
+}
+
+type ProjectTimelineSegmentResponse struct {
+	Index         int    `json:"index"`
+	MediaFileID   string `json:"mediaFileId"`
+	SourceStartMs int64  `json:"sourceStartMs"`
+	SourceEndMs   int64  `json:"sourceEndMs"`
+	OutputStartMs int64  `json:"outputStartMs"`
+	OutputEndMs   int64  `json:"outputEndMs"`
+}
+
+type ProjectEditDecisionResponse struct {
+	ID            string   `json:"id"`
+	MediaFileID   string   `json:"mediaFileId"`
+	Type          string   `json:"type"`
+	SourceStartMs int64    `json:"sourceStartMs"`
+	SourceEndMs   int64    `json:"sourceEndMs"`
+	Action        string   `json:"action"`
+	Source        string   `json:"source"`
+	Confidence    *float64 `json:"confidence"`
+	Reasons       []string `json:"reasons"`
+}
+
 func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) ProjectDetailResponse {
 	mediaFiles := make([]ProjectMediaFileResponse, 0, len(view.MediaFiles))
 	for _, media := range view.MediaFiles {
@@ -119,6 +155,7 @@ func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) Proj
 		UpdatedAt:  view.UpdatedAt,
 		MediaFiles: mediaFiles,
 		Jobs:       newProjectJobResponses(view.Jobs),
+		Timelines:  newProjectTimelineResponses(view.Timelines),
 	}
 }
 
@@ -135,6 +172,55 @@ func newProjectJobResponses(jobs []domainproject.ProjectJobView) []ProjectJobRes
 			UpdatedAt:    job.UpdatedAt,
 			StartedAt:    job.StartedAt,
 			CompletedAt:  job.CompletedAt,
+		})
+	}
+	return out
+}
+
+func newProjectTimelineResponses(timelines []domainproject.ProjectTimelineView) []ProjectTimelineResponse {
+	out := make([]ProjectTimelineResponse, 0, len(timelines))
+	for _, tl := range timelines {
+		segments := make([]ProjectTimelineSegmentResponse, 0, len(tl.Segments))
+		for _, seg := range tl.Segments {
+			segments = append(segments, ProjectTimelineSegmentResponse{
+				Index:         seg.Index,
+				MediaFileID:   seg.MediaFileID.String(),
+				SourceStartMs: seg.SourceStartMs,
+				SourceEndMs:   seg.SourceEndMs,
+				OutputStartMs: seg.OutputStartMs,
+				OutputEndMs:   seg.OutputEndMs,
+			})
+		}
+		decisions := make([]ProjectEditDecisionResponse, 0, len(tl.Decisions))
+		for _, dec := range tl.Decisions {
+			reasons := dec.Reasons
+			if reasons == nil {
+				reasons = []string{}
+			}
+			decisions = append(decisions, ProjectEditDecisionResponse{
+				ID:            dec.ID.String(),
+				MediaFileID:   dec.MediaFileID.String(),
+				Type:          dec.Type,
+				SourceStartMs: dec.SourceStartMs,
+				SourceEndMs:   dec.SourceEndMs,
+				Action:        dec.Action,
+				Source:        dec.Source,
+				Confidence:    dec.Confidence,
+				Reasons:       reasons,
+			})
+		}
+		out = append(out, ProjectTimelineResponse{
+			ID:            tl.ID.String(),
+			MediaFileID:   tl.MediaFileID.String(),
+			Version:       tl.Version,
+			DurationMs:    tl.DurationMs,
+			Fingerprint:   tl.Fingerprint,
+			EngineVersion: tl.EngineVersion,
+			IsActive:      tl.IsActive,
+			Segments:      segments,
+			Decisions:     decisions,
+			CreatedAt:     tl.CreatedAt,
+			UpdatedAt:     tl.UpdatedAt,
 		})
 	}
 	return out

@@ -41,6 +41,8 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		write.NewTranscriptWriteRepository(db),
 		write.NewDetectedTranscriptIssueWriteRepository(db),
 		write.NewMediaConfigurationWriteRepository(db),
+		write.NewMediaFileWriteRepository(db),
+		write.NewTimelineWriteRepository(db),
 		write.NewJobWriteRepository(db),
 		outboxRepo,
 	)

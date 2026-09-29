@@ -12,6 +12,7 @@ import (
 	"go-api/internal/domain/event"
 	domainjob "go-api/internal/domain/job"
 	domainmediaconfig "go-api/internal/domain/mediaconfig"
+	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
 	domainsilence "go-api/internal/domain/silence"
 	domaintimeline "go-api/internal/domain/timeline"
@@ -28,18 +29,22 @@ type DetectSilenceCommand struct {
 }
 
 type DetectSilenceHandler struct {
-	silenceRepo domainsilence.DetectedSilenceWriteRepository
-	configRepo  domainmediaconfig.MediaConfigurationWriteRepository
-	jobRepo     domainjob.JobWriteRepository
-	storage     port.Storage
-	detector    port.SilenceDetector
-	noiseFloor  port.NoiseFloorAnalyzer
-	outbox      port.OutboxRepository
+	silenceRepo  domainsilence.DetectedSilenceWriteRepository
+	configRepo   domainmediaconfig.MediaConfigurationWriteRepository
+	mediaRepo    domainmediafile.MediaFileWriteRepository
+	timelineRepo domaintimeline.TimelineWriteRepository
+	jobRepo      domainjob.JobWriteRepository
+	storage      port.Storage
+	detector     port.SilenceDetector
+	noiseFloor   port.NoiseFloorAnalyzer
+	outbox       port.OutboxRepository
 }
 
 func NewDetectSilenceHandler(
 	silenceRepo domainsilence.DetectedSilenceWriteRepository,
 	configRepo domainmediaconfig.MediaConfigurationWriteRepository,
+	mediaRepo domainmediafile.MediaFileWriteRepository,
+	timelineRepo domaintimeline.TimelineWriteRepository,
 	jobRepo domainjob.JobWriteRepository,
 	storage port.Storage,
 	detector port.SilenceDetector,
@@ -47,13 +52,15 @@ func NewDetectSilenceHandler(
 	outbox port.OutboxRepository,
 ) *DetectSilenceHandler {
 	return &DetectSilenceHandler{
-		silenceRepo: silenceRepo,
-		configRepo:  configRepo,
-		jobRepo:     jobRepo,
-		storage:     storage,
-		detector:    detector,
-		noiseFloor:  noiseFloor,
-		outbox:      outbox,
+		silenceRepo:  silenceRepo,
+		configRepo:   configRepo,
+		mediaRepo:    mediaRepo,
+		timelineRepo: timelineRepo,
+		jobRepo:      jobRepo,
+		storage:      storage,
+		detector:     detector,
+		noiseFloor:   noiseFloor,
+		outbox:       outbox,
 	}
 }
 
@@ -83,7 +90,7 @@ func (h *DetectSilenceHandler) Handle(ctx context.Context, cmd DetectSilenceComm
 		return messaging.Retryable(err)
 	}
 	if existing > 0 {
-		return h.markJobSuccess(ctx, cmd.JobID)
+		return h.persistResults(ctx, cmd, nil)
 	}
 
 	tmp, err := os.CreateTemp("", "media-silence-*.opus")
@@ -180,54 +187,66 @@ func (h *DetectSilenceHandler) persistResults(
 		if err != nil {
 			return messaging.Retryable(err)
 		}
+		events := make([]event.DomainEvent, 0, 4)
 		if count > 0 {
-			return h.markJobSuccessInTx(txCtx, cmd.JobID)
+			if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
+				return err
+			}
+			if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "silence_detected"); err != nil {
+				return err
+			}
+			if len(events) == 0 {
+				return nil
+			}
+			return h.outbox.StoreEvents(txCtx, events)
 		}
 		if err := h.silenceRepo.ReplaceForMediaFile(txCtx, cmd.MediaFileID, rows); err != nil {
 			return messaging.Retryable(err)
 		}
 
-		events := []event.DomainEvent{
-			domainsilence.SilenceDetected{
-				ID:           uuid.New().String(),
-				MediaFileID:  cmd.MediaFileID.String(),
-				ProjectID:    cmd.ProjectID.String(),
-				UserID:       cmd.UserID.String(),
-				SilenceCount: len(rows),
-				Timestamp:    time.Now().UTC(),
-			},
-		}
-		if cmd.JobID != uuid.Nil {
-			job, err := h.jobRepo.GetByID(txCtx, cmd.JobID)
-			if err != nil {
-				return messaging.Retryable(err)
-			}
-			if job != nil && job.Status != domainjob.StatusSuccess {
-				job.MarkSuccess()
-				if err := h.jobRepo.Update(txCtx, job); err != nil {
-					return messaging.Retryable(err)
-				}
-				events = append(events, job.PullEvents()...)
-			}
-		}
-
-		timelineJob := domainjob.New(cmd.ProjectID, cmd.MediaFileID, cmd.UserID, domainjob.NameRebuildTimeline)
-		if err := h.jobRepo.Save(txCtx, timelineJob); err != nil {
-			return messaging.Retryable(err)
-		}
-		events = append(events, timelineJob.PullEvents()...)
-		events = append(events, domaintimeline.RebuildRequested{
-			ID:          uuid.New().String(),
-			MediaFileID: cmd.MediaFileID.String(),
-			ProjectID:   cmd.ProjectID.String(),
-			UserID:      cmd.UserID.String(),
-			JobID:       timelineJob.ID.String(),
-			Reason:      "silence_detected",
-			Timestamp:   time.Now().UTC(),
+		events = append(events, domainsilence.SilenceDetected{
+			ID:           uuid.New().String(),
+			MediaFileID:  cmd.MediaFileID.String(),
+			ProjectID:    cmd.ProjectID.String(),
+			UserID:       cmd.UserID.String(),
+			SilenceCount: len(rows),
+			Timestamp:    time.Now().UTC(),
 		})
-
+		if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
+			return err
+		}
+		if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "silence_detected"); err != nil {
+			return err
+		}
 		return h.outbox.StoreEvents(txCtx, events)
 	})
+}
+
+func (h *DetectSilenceHandler) timelineDeps() timelineRebuildDeps {
+	return timelineRebuildDeps{
+		mediaRepo:    h.mediaRepo,
+		jobRepo:      h.jobRepo,
+		timelineRepo: h.timelineRepo,
+	}
+}
+
+func (h *DetectSilenceHandler) markJobSuccessEvents(ctx context.Context, jobID uuid.UUID, events *[]event.DomainEvent) error {
+	if jobID == uuid.Nil {
+		return nil
+	}
+	job, err := h.jobRepo.GetByID(ctx, jobID)
+	if err != nil {
+		return messaging.Retryable(err)
+	}
+	if job == nil || job.Status == domainjob.StatusSuccess {
+		return nil
+	}
+	job.MarkSuccess()
+	if err := h.jobRepo.Update(ctx, job); err != nil {
+		return messaging.Retryable(err)
+	}
+	*events = append(*events, job.PullEvents()...)
+	return nil
 }
 
 func (h *DetectSilenceHandler) markProcessing(ctx context.Context, jobID uuid.UUID) error {
@@ -248,30 +267,6 @@ func (h *DetectSilenceHandler) markProcessing(ctx context.Context, jobID uuid.UU
 		}
 		return h.outbox.StoreEvents(txCtx, job.PullEvents())
 	})
-}
-
-func (h *DetectSilenceHandler) markJobSuccess(ctx context.Context, jobID uuid.UUID) error {
-	return h.jobRepo.WithTransaction(ctx, func(txCtx context.Context) error {
-		return h.markJobSuccessInTx(txCtx, jobID)
-	})
-}
-
-func (h *DetectSilenceHandler) markJobSuccessInTx(ctx context.Context, jobID uuid.UUID) error {
-	if jobID == uuid.Nil {
-		return nil
-	}
-	job, err := h.jobRepo.GetByID(ctx, jobID)
-	if err != nil {
-		return messaging.Retryable(err)
-	}
-	if job == nil || job.Status == domainjob.StatusSuccess {
-		return nil
-	}
-	job.MarkSuccess()
-	if err := h.jobRepo.Update(ctx, job); err != nil {
-		return messaging.Retryable(err)
-	}
-	return h.outbox.StoreEvents(ctx, job.PullEvents())
 }
 
 func (h *DetectSilenceHandler) fail(ctx context.Context, jobID uuid.UUID, reason string) error {

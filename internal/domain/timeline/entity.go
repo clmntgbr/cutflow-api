@@ -90,6 +90,7 @@ type TimelineWriteRepository interface {
 	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 	GetActiveByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) (*Timeline, error)
 	FindByFingerprint(ctx context.Context, mediaFileID uuid.UUID, fingerprint string) (*Timeline, error)
+	ExistsByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) (bool, error)
 	NextVersion(ctx context.Context, mediaFileID uuid.UUID) (int, error)
 	Save(ctx context.Context, tl *Timeline) error
 	DeactivateOthers(ctx context.Context, mediaFileID, keepID uuid.UUID) error
