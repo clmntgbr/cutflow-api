@@ -8,8 +8,8 @@ import (
 	eventmediafile "go-api/internal/application/event/mediafile"
 	"go-api/internal/application/registry"
 	domainmediafile "go-api/internal/domain/mediafile"
+	"go-api/internal/infrastructure/assemblyai"
 	"go-api/internal/infrastructure/config"
-	inframedia "go-api/internal/infrastructure/media"
 	"go-api/internal/infrastructure/messaging/rabbitmq"
 	"go-api/internal/infrastructure/persistence/outbox"
 	"go-api/internal/infrastructure/persistence/processed"
@@ -27,8 +27,8 @@ type Container struct {
 func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	topology := rabbitmq.DefaultTopology(
 		env.RabbitMQExchange,
-		env.ExtractionQueue,
-		env.ExtractionRoutingKey,
+		env.TranscriptQueue,
+		env.TranscriptRoutingKey,
 		env.RabbitMQRetryTTLMS,
 	)
 
@@ -44,21 +44,20 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 
 	outboxRepo := outbox.NewRepository(db)
 	dedupRepo := processed.NewRepository(db)
-	extractAudioHandler := cmdmediafile.NewExtractAudioHandler(
-		write.NewMediaFileWriteRepository(db),
-		write.NewMediaAudioWriteRepository(db),
+	transcribeHandler := cmdmediafile.NewTranscribeAudioHandler(
+		write.NewTranscriptWriteRepository(db),
 		minioStorage,
-		inframedia.NewAudioExtractor(),
+		assemblyai.NewClient(env.AssemblyAIAPIKey),
 		outboxRepo,
 	)
 
 	reg := registry.NewHandlerRegistry()
-	reg.Register(domainmediafile.EventTypeMediaFileReady, dedup.With(
+	reg.Register(domainmediafile.EventTypeMediaFileTranscriptRequested, dedup.With(
 		dedupRepo,
-		"extract_audio_on_media_file_ready",
-		eventmediafile.NewExtractAudioOnReadyHandler(extractAudioHandler).Handle,
+		"transcribe_audio_on_requested",
+		eventmediafile.NewTranscribeAudioOnRequestedHandler(transcribeHandler).Handle,
 	))
 
-	consumer := rabbitmq.NewConsumer(conn, reg, env.ExtractionConcurrency, env.WorkerMaxRetries)
+	consumer := rabbitmq.NewConsumer(conn, reg, env.TranscriptConcurrency, env.WorkerMaxRetries)
 	return &Container{Consumer: consumer, Conn: conn}
 }

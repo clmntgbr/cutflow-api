@@ -9,8 +9,9 @@ const (
 	ActionProbing        = "probing"
 	ActionReady          = "ready"
 	ActionFailed         = "failed"
-	ActionSegmentsReady  = "segments_ready"
-	ActionAudioReady     = "audio_ready"
+	ActionAudioReady       = "audio_ready"
+	ActionSilenceDetected  = "silence_detected"
+	ActionTranscriptReady  = "transcript_ready"
 
 	EntityUser      = "user"
 	EntityMediaFile = "media_file"

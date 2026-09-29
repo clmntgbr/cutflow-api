@@ -46,12 +46,18 @@ type Config struct {
 	UploadURLTTL            time.Duration
 	ExpireUploadsInterval   time.Duration
 	MediaMaxSizeBytes       int64
-	SegmentDurationMs       int64
-	SegmentOverlapMs        int64
-	SegmentMaxCount         int
 	ExtractionQueue         string
 	ExtractionRoutingKey    string
 	ExtractionConcurrency   int
+	SilenceQueue            string
+	SilenceRoutingKey       string
+	SilenceConcurrency      int
+	SilenceThresholdDB      float64
+	SilenceMinDurationMs    int64
+	TranscriptQueue         string
+	TranscriptRoutingKey    string
+	TranscriptConcurrency   int
+	AssemblyAIAPIKey        string
 }
 
 func Load() *Config {
@@ -95,12 +101,18 @@ func Load() *Config {
 		UploadURLTTL:            getEnvDuration("UPLOAD_URL_TTL", 15*time.Minute),
 		ExpireUploadsInterval:   getEnvDuration("EXPIRE_UPLOADS_INTERVAL", time.Minute),
 		MediaMaxSizeBytes:       getEnvInt64OrDefault("MEDIA_MAX_SIZE_BYTES", 2*1024*1024*1024),
-		SegmentDurationMs:       getEnvInt64OrDefault("SEGMENT_DURATION_MS", 5*60*1000),
-		SegmentOverlapMs:        getEnvInt64OrDefault("SEGMENT_OVERLAP_MS", 2*1000),
-		SegmentMaxCount:         getEnvIntOrDefault("SEGMENT_MAX_COUNT", 40),
 		ExtractionQueue:         getEnvOrDefault("EXTRACTION_QUEUE", "extraction"),
-		ExtractionRoutingKey:    getEnvOrDefault("EXTRACTION_ROUTING_KEY", "media_file.segments_ready.v1"),
-		ExtractionConcurrency:   getEnvIntOrDefault("EXTRACTION_CONCURRENCY", 2),
+		ExtractionRoutingKey:    getEnvOrDefault("EXTRACTION_ROUTING_KEY", "media_file.ready.v1"),
+		ExtractionConcurrency:   getEnvIntOrDefault("EXTRACTION_CONCURRENCY", 5),
+		SilenceQueue:            getEnvOrDefault("SILENCE_QUEUE", "silence"),
+		SilenceRoutingKey:       getEnvOrDefault("SILENCE_ROUTING_KEY", "media_file.silence_requested.v1"),
+		SilenceConcurrency:      getEnvIntOrDefault("SILENCE_CONCURRENCY", 5),
+		SilenceThresholdDB:      getEnvFloat64OrDefault("SILENCE_THRESHOLD_DB", -35),
+		SilenceMinDurationMs:    getEnvInt64OrDefault("SILENCE_MIN_DURATION_MS", 400),
+		TranscriptQueue:         getEnvOrDefault("TRANSCRIPT_QUEUE", "transcript"),
+		TranscriptRoutingKey:    getEnvOrDefault("TRANSCRIPT_ROUTING_KEY", "media_file.transcript_requested.v1"),
+		TranscriptConcurrency:   getEnvIntOrDefault("TRANSCRIPT_CONCURRENCY", 5),
+		AssemblyAIAPIKey:        getEnvOrDefault("ASSEMBLYAI_API_KEY", ""),
 	}
 }
 
@@ -174,6 +186,19 @@ func getEnvInt64OrDefault(key string, defaultValue int64) int64 {
 	parsedValue, err := strconv.ParseInt(value, 10, 64)
 	if err != nil {
 		log.Panicf("invalid int64 for %s: %q", key, value)
+		return 0
+	}
+	return parsedValue
+}
+
+func getEnvFloat64OrDefault(key string, defaultValue float64) float64 {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	parsedValue, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		log.Panicf("invalid float64 for %s: %q", key, value)
 		return 0
 	}
 	return parsedValue

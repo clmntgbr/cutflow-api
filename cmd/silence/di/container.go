@@ -27,8 +27,8 @@ type Container struct {
 func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	topology := rabbitmq.DefaultTopology(
 		env.RabbitMQExchange,
-		env.ExtractionQueue,
-		env.ExtractionRoutingKey,
+		env.SilenceQueue,
+		env.SilenceRoutingKey,
 		env.RabbitMQRetryTTLMS,
 	)
 
@@ -44,21 +44,22 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 
 	outboxRepo := outbox.NewRepository(db)
 	dedupRepo := processed.NewRepository(db)
-	extractAudioHandler := cmdmediafile.NewExtractAudioHandler(
-		write.NewMediaFileWriteRepository(db),
-		write.NewMediaAudioWriteRepository(db),
+	detectHandler := cmdmediafile.NewDetectSilenceHandler(
+		write.NewDetectedSilenceWriteRepository(db),
 		minioStorage,
-		inframedia.NewAudioExtractor(),
+		inframedia.NewSilenceDetector(),
 		outboxRepo,
+		env.SilenceThresholdDB,
+		env.SilenceMinDurationMs,
 	)
 
 	reg := registry.NewHandlerRegistry()
-	reg.Register(domainmediafile.EventTypeMediaFileReady, dedup.With(
+	reg.Register(domainmediafile.EventTypeMediaFileSilenceRequested, dedup.With(
 		dedupRepo,
-		"extract_audio_on_media_file_ready",
-		eventmediafile.NewExtractAudioOnReadyHandler(extractAudioHandler).Handle,
+		"detect_silence_on_requested",
+		eventmediafile.NewDetectSilenceOnRequestedHandler(detectHandler).Handle,
 	))
 
-	consumer := rabbitmq.NewConsumer(conn, reg, env.ExtractionConcurrency, env.WorkerMaxRetries)
+	consumer := rabbitmq.NewConsumer(conn, reg, env.SilenceConcurrency, env.WorkerMaxRetries)
 	return &Container{Consumer: consumer, Conn: conn}
 }

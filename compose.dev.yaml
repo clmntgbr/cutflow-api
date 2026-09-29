@@ -81,8 +81,63 @@ services:
       - .env
     environment:
       EXTRACTION_QUEUE: ${EXTRACTION_QUEUE:-extraction}
-      EXTRACTION_ROUTING_KEY: ${EXTRACTION_ROUTING_KEY:-media_file.segments_ready.v1}
-      EXTRACTION_CONCURRENCY: ${EXTRACTION_CONCURRENCY:-2}
+      EXTRACTION_ROUTING_KEY: ${EXTRACTION_ROUTING_KEY:-media_file.ready.v1}
+      EXTRACTION_CONCURRENCY: ${EXTRACTION_CONCURRENCY:-5}
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - api
+    restart: unless-stopped
+
+  silence:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: silence
+    command: ["go", "run", "./cmd/silence"]
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      SILENCE_QUEUE: ${SILENCE_QUEUE:-silence}
+      SILENCE_ROUTING_KEY: ${SILENCE_ROUTING_KEY:-media_file.silence_requested.v1}
+      SILENCE_CONCURRENCY: ${SILENCE_CONCURRENCY:-5}
+      SILENCE_THRESHOLD_DB: "${SILENCE_THRESHOLD_DB:--35}"
+      SILENCE_MIN_DURATION_MS: ${SILENCE_MIN_DURATION_MS:-400}
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - api
+    restart: unless-stopped
+
+  transcript:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: transcript
+    command: ["go", "run", "./cmd/transcript"]
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      TRANSCRIPT_QUEUE: ${TRANSCRIPT_QUEUE:-transcript}
+      TRANSCRIPT_ROUTING_KEY: ${TRANSCRIPT_ROUTING_KEY:-media_file.transcript_requested.v1}
+      TRANSCRIPT_CONCURRENCY: ${TRANSCRIPT_CONCURRENCY:-5}
+      ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY:-}
     depends_on:
       database:
         condition: service_healthy

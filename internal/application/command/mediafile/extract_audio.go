@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"go-api/internal/application/messaging"
 	domainmediaaudio "go-api/internal/domain/mediaaudio"
@@ -145,7 +146,28 @@ func (h *ExtractAudioHandler) complete(ctx context.Context, mediaFileID uuid.UUI
 		if err := h.audioRepo.Update(txCtx, audio); err != nil {
 			return messaging.Retryable(err)
 		}
-		return h.outbox.StoreEvents(txCtx, audio.PullEvents())
+
+		now := time.Now().UTC()
+		events := audio.PullEvents()
+		events = append(events,
+			domainmediafile.MediaFileSilenceRequested{
+				ID:          uuid.New().String(),
+				MediaFileID: audio.MediaFileID.String(),
+				ProjectID:   audio.ProjectID.String(),
+				UserID:      audio.UserID.String(),
+				AudioKey:    audio.StorageKey,
+				Timestamp:   now,
+			},
+			domainmediafile.MediaFileTranscriptRequested{
+				ID:          uuid.New().String(),
+				MediaFileID: audio.MediaFileID.String(),
+				ProjectID:   audio.ProjectID.String(),
+				UserID:      audio.UserID.String(),
+				AudioKey:    audio.StorageKey,
+				Timestamp:   now,
+			},
+		)
+		return h.outbox.StoreEvents(txCtx, events)
 	})
 }
 

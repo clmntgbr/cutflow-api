@@ -10,6 +10,8 @@ import (
 	domainmediaaudio "go-api/internal/domain/mediaaudio"
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
+	domainsilence "go-api/internal/domain/silence"
+	domaintranscript "go-api/internal/domain/transcript"
 )
 
 type PublishRealtimeHandler struct {
@@ -36,8 +38,12 @@ type mediaFileRealtimePayload struct {
 	AudioSampleRate *int      `json:"audioSampleRate,omitempty"`
 	AudioChannels   *int      `json:"audioChannels,omitempty"`
 	SizeBytes       int64     `json:"sizeBytes,omitempty"`
-	SegmentCount    int       `json:"segmentCount,omitempty"`
 	HasAudio        bool      `json:"hasAudio,omitempty"`
+	SilenceCount    int       `json:"silenceCount,omitempty"`
+	WordCount       int       `json:"wordCount,omitempty"`
+	Language        string    `json:"language,omitempty"`
+	SRTKey          string    `json:"srtKey,omitempty"`
+	ASSKey          string    `json:"assKey,omitempty"`
 	Reason          string    `json:"reason,omitempty"`
 	OccurredAt      time.Time `json:"occurredAt"`
 }
@@ -125,22 +131,6 @@ func (h *PublishRealtimeHandler) OnProbeFailed(ctx context.Context, payload []by
 	})
 }
 
-func (h *PublishRealtimeHandler) OnSegmentsReady(ctx context.Context, payload []byte) error {
-	var evt domainmediafile.MediaFileSegmentsReady
-	if err := json.Unmarshal(payload, &evt); err != nil {
-		return messaging.NonRetryable(err)
-	}
-	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionSegmentsReady, evt.UserID, mediaFileRealtimePayload{
-		MediaFileID:  evt.MediaFileID,
-		ProjectID:    evt.ProjectID,
-		Status:       domainmediafile.StatusReady,
-		DurationMs:   evt.DurationMs,
-		SegmentCount: evt.SegmentCount,
-		HasAudio:     evt.HasAudio,
-		OccurredAt:   evt.Timestamp,
-	})
-}
-
 func (h *PublishRealtimeHandler) OnAudioReady(ctx context.Context, payload []byte) error {
 	var evt domainmediaaudio.MediaAudioReady
 	if err := json.Unmarshal(payload, &evt); err != nil {
@@ -157,6 +147,50 @@ func (h *PublishRealtimeHandler) OnAudioReady(ctx context.Context, payload []byt
 
 func (h *PublishRealtimeHandler) OnAudioFailed(ctx context.Context, payload []byte) error {
 	var evt domainmediaaudio.MediaAudioFailed
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionFailed, evt.UserID, mediaFileRealtimePayload{
+		MediaFileID: evt.MediaFileID,
+		ProjectID:   evt.ProjectID,
+		Status:      evt.Status,
+		Reason:      evt.Reason,
+		OccurredAt:  evt.Timestamp,
+	})
+}
+
+func (h *PublishRealtimeHandler) OnSilenceDetected(ctx context.Context, payload []byte) error {
+	var evt domainsilence.SilenceDetected
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionSilenceDetected, evt.UserID, mediaFileRealtimePayload{
+		MediaFileID:  evt.MediaFileID,
+		ProjectID:    evt.ProjectID,
+		SilenceCount: evt.SilenceCount,
+		OccurredAt:   evt.Timestamp,
+	})
+}
+
+func (h *PublishRealtimeHandler) OnTranscriptReady(ctx context.Context, payload []byte) error {
+	var evt domaintranscript.TranscriptReady
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionTranscriptReady, evt.UserID, mediaFileRealtimePayload{
+		MediaFileID: evt.MediaFileID,
+		ProjectID:   evt.ProjectID,
+		Status:      evt.Status,
+		Language:    evt.Language,
+		WordCount:   evt.WordCount,
+		SRTKey:      evt.SRTKey,
+		ASSKey:      evt.ASSKey,
+		OccurredAt:  evt.Timestamp,
+	})
+}
+
+func (h *PublishRealtimeHandler) OnTranscriptFailed(ctx context.Context, payload []byte) error {
+	var evt domaintranscript.TranscriptFailed
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}

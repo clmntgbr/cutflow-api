@@ -630,95 +630,56 @@ trouvent intéressantes.
 
 ## 14. Complément d'architecture --- pipeline parallèle, Master Render et clips viraux
 
-### 14.1 Segments techniques vs segments de montage
+### 14.1 Pas de TechnicalSegment pour silence / ASR
 
-Le découpage initial sert à paralléliser le traitement. Un
-`TechnicalSegment` est avant tout une fenêtre temporelle dans le média
-source, et non nécessairement un nouveau fichier MP4.
+Avec Opus (fichier audio léger) et AssemblyAI (ASR full-file + SRT),
+le découpage en `TechnicalSegment` n'apporte rien pour la détection
+de silences ni la transcription :
 
-Exemple :
+- `ffmpeg silencedetect` sur un Opus d'1 h reste négligeable ;
+- AssemblyAI accepte le fichier complet et renvoie SRT + mots horodatés ;
+- chunking + overlap + merge ajouterait de la complexité sans gain
+  de latence ni de coût measurable à notre échelle.
 
-``` json
-{
-  "media_id": "video-123",
-  "start_ms": 300000,
-  "end_ms": 600000
-}
-```
-
-Il faut distinguer :
-
--   `TechnicalSegment` : fenêtre utilisée par les workers pour
-    distribuer le calcul ;
--   `CutSegment` : portion réellement conservée dans la timeline de
-    montage ;
--   `ViralClip` : portion intéressante de la timeline finale destinée à
-    devenir éventuellement un clip.
-
-Éviter autant que possible de créer physiquement `chunk-001.mp4`,
-`chunk-002.mp4`, etc. Les workers peuvent travailler directement à
-partir du média source et d'une plage temporelle.
-
-### 14.2 Extraction audio unique
-
-L'audio doit idéalement être extrait une seule fois par média source :
+On traite donc **l'audio complet** en parallèle après extraction :
 
 ``` text
 VIDEO SOURCE
     ↓
-EXTRACTION AUDIO
+EXTRACTION AUDIO (Opus)
     ↓
-AUDIO COMPLET
-    ↓
-fenêtres audio logiques
-    ├── SilenceDetection
-    └── Transcription
+media_file.audio_ready
+    ├── media_file.silence_requested  → worker silence (ffmpeg)
+    └── media_file.transcript_requested → worker transcript (AssemblyAI → SRT → ASS)
 ```
 
-La détection des silences et l'ASR réutilisent ainsi la même extraction.
+Les `CutSegment` (montage) et `ViralClip` restent distincts et viendront
+plus tard à partir du transcript global + des silences détectés.
 
-### 14.3 Transcription parallèle avec overlap
+### 14.2 Extraction audio unique
 
-Pour éviter de casser une phrase exactement à la frontière entre deux
-chunks, les fenêtres envoyées à l'ASR doivent comporter un petit
-overlap.
+L'audio est extrait **une seule fois** par média source (worker
+`extraction` sur `media_file.ready.v1`). Silence et transcription
+réutilisent la même clé MinIO.
 
-``` text
-Segment logique 1 : 00:00 → 05:00
-ASR               : 00:00 → 05:02
+### 14.3 Transcript global (full-file)
 
-Segment logique 2 : 05:00 → 10:00
-ASR               : 04:58 → 10:02
-```
+Pas de `TranscriptSegment` / merge d'overlap : un seul job AssemblyAI
+par média produit :
 
-Au merge, les mots présents dans les zones d'overlap sont dédupliqués.
-Les timestamps finaux restent exprimés dans le temps absolu du média
-source.
+- `transcript.text` + `transcript_word[]` ;
+- `subtitles.srt` (API AssemblyAI) puis `subtitles.ass` (conversion
+  locale).
 
-### 14.4 Transcript global
+Le transcript global sert ensuite à détecter fillers / répétitions,
+générer les sous-titres remappés sur la timeline, et analyser les
+moments viraux.
 
-Les résultats ASR des chunks sont fusionnés avant les traitements
-nécessitant du contexte :
+### 14.4 Analyse virale globale
 
-``` text
-TranscriptSegment 1 ─┐
-TranscriptSegment 2 ─┤
-TranscriptSegment 3 ─┼──→ GLOBAL TRANSCRIPT
-TranscriptSegment 4 ─┘
-```
-
-Le transcript global sert ensuite à :
-
--   détecter fillers et répétitions ;
--   générer les sous-titres ;
--   analyser les moments viraux ;
--   naviguer dans le contenu.
-
-### 14.5 Analyse virale globale
-
-La détection des moments viraux ne doit pas être exécutée indépendamment
-sur chaque chunk technique. Un passage intéressant peut commencer dans
-un chunk et finir dans le suivant.
+La détection des moments viraux s'appuie sur le **transcript global**,
+pas sur des fenêtres techniques. Un passage intéressant est découpé
+sémantiquement (20–90 s) puis scoré par LLM.
 
 ``` text
 GLOBAL TRANSCRIPT
@@ -734,7 +695,7 @@ ViralClip[]
 
 Les bornes des clips viraux sont donc connues avant le rendu final.
 
-### 14.6 Timeline comme source de vérité
+### 14.5 Timeline comme source de vérité
 
 La `Timeline` est la représentation centrale du montage.
 
@@ -758,7 +719,7 @@ OUTPUT TIME
 00:00 ------------------------ 24:32
 ```
 
-### 14.7 ASS/SRT après remapping
+### 14.6 ASS/SRT après remapping
 
 Les fichiers de sous-titres finaux doivent être générés à partir du
 transcript global **et de la timeline finale**.
@@ -776,7 +737,7 @@ TIMESTAMP REMAPPING
 Une coupe de cinq secondes décale tous les sous-titres situés après
 cette coupe dans la vidéo de sortie.
 
-### 14.8 Conversion 16:9 → 9:16
+### 14.7 Conversion 16:9 → 9:16
 
 Le passage au format TikTok / Reels / Shorts ne nécessite pas
 obligatoirement de tracking de visage.
@@ -792,7 +753,7 @@ Les modes simples peuvent être :
 Le crop et le scale nécessitent un réencodage, mais pas d'analyse IA
 image par image.
 
-### 14.9 Un seul rendu final
+### 14.8 Un seul rendu final
 
 Éviter :
 
@@ -834,7 +795,7 @@ FINAL.MP4
 
 Le but est de ne réencoder la vidéo qu'une seule fois.
 
-### 14.10 Master Render
+### 14.9 Master Render
 
 Un `MasterRender` est une vidéo complètement rendue correspondant à une
 timeline et à un ensemble précis de paramètres :
@@ -861,7 +822,7 @@ Overlays
 MASTER-SOCIAL.MP4
 ```
 
-### 14.11 Extraction rapide des clips viraux
+### 14.10 Extraction rapide des clips viraux
 
 Si un clip viral utilise exactement le même format et le même style que
 le Master Render, il n'est pas nécessaire de le réencoder.
@@ -875,7 +836,7 @@ ffmpeg -ss 134.2 -i master.mp4 -t 38.6 -c copy viral-01.mp4
 Avec `-c copy`, FFmpeg copie les flux sans décoder/réencoder toute la
 vidéo. Le coût CPU devient très faible.
 
-### 14.12 Keyframes
+### 14.11 Keyframes
 
 Le stream copy dépend des keyframes pour obtenir des coupes propres.
 
@@ -891,7 +852,7 @@ ViralClip 3 start → 1024.800 s
 Ces timestamps peuvent être transmis au renderer comme keyframes
 forcées.
 
-### 14.13 Réutilisation du Master
+### 14.12 Réutilisation du Master
 
 Un clip peut utiliser `stream_copy` lorsque ses paramètres correspondent
 au Master :
@@ -931,7 +892,7 @@ VIRAL CLIP
 Si le Master est 16:9 et le clip demandé en 9:16, ou si le
 style/crop/overlay diffère, un nouveau rendu est nécessaire.
 
-### 14.14 Plusieurs Masters
+### 14.13 Plusieurs Masters
 
 Un projet peut avoir plusieurs Masters lorsque cela est réellement utile
 :
@@ -949,7 +910,7 @@ PROJECT
 Les clips sociaux peuvent alors être extraits du Master Social sans
 rendu complet supplémentaire.
 
-### 14.15 Pipeline final
+### 14.14 Pipeline final
 
 ``` text
                     VIDEO SOURCE
@@ -1092,29 +1053,11 @@ CREATE TABLE media_audio (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE technical_segment (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    media_file_id UUID NOT NULL REFERENCES media_file(id) ON DELETE CASCADE,
-    segment_index INTEGER NOT NULL,
-    start_ms BIGINT NOT NULL,
-    end_ms BIGINT NOT NULL,
-    processing_start_ms BIGINT NOT NULL,
-    processing_end_ms BIGINT NOT NULL,
-    status job_status NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (start_ms >= 0),
-    CHECK (end_ms > start_ms),
-    CHECK (processing_start_ms >= 0 AND processing_end_ms > processing_start_ms),
-    UNIQUE (media_file_id, segment_index)
-);
-
-CREATE INDEX idx_technical_segment_media ON technical_segment(media_file_id);
-CREATE INDEX idx_technical_segment_status ON technical_segment(status);
+-- Pas de technical_segment : silence + ASR full-file sur l'audio extrait.
 
 CREATE TABLE detected_silence (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     media_file_id UUID NOT NULL REFERENCES media_file(id) ON DELETE CASCADE,
-    technical_segment_id UUID REFERENCES technical_segment(id) ON DELETE CASCADE,
     start_ms BIGINT NOT NULL,
     end_ms BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1128,20 +1071,16 @@ CREATE INDEX idx_detected_silence_media_time
 CREATE TABLE transcript (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     media_file_id UUID NOT NULL UNIQUE REFERENCES media_file(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     language VARCHAR(10),
     text TEXT,
+    srt_storage_key TEXT NOT NULL DEFAULT '',
+    ass_storage_key TEXT NOT NULL DEFAULT '',
+    provider_job_id VARCHAR(100),
     status job_status NOT NULL DEFAULT 'pending',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE transcript_segment (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    transcript_id UUID NOT NULL REFERENCES transcript(id) ON DELETE CASCADE,
-    technical_segment_id UUID NOT NULL UNIQUE REFERENCES technical_segment(id) ON DELETE CASCADE,
-    text TEXT,
-    status job_status NOT NULL DEFAULT 'pending',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE transcript_word (
@@ -1338,7 +1277,6 @@ CREATE TABLE processing_job (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     project_id UUID NOT NULL REFERENCES project(id) ON DELETE CASCADE,
     media_file_id UUID REFERENCES media_file(id) ON DELETE CASCADE,
-    technical_segment_id UUID REFERENCES technical_segment(id) ON DELETE CASCADE,
     type VARCHAR(100) NOT NULL,
     status job_status NOT NULL DEFAULT 'pending',
     attempt INTEGER NOT NULL DEFAULT 0,
@@ -1355,9 +1293,6 @@ CREATE INDEX idx_processing_job_status_type
 
 CREATE INDEX idx_processing_job_project
     ON processing_job(project_id);
-
-CREATE INDEX idx_processing_job_segment
-    ON processing_job(technical_segment_id);
 ```
 
 ------------------------------------------------------------------------
@@ -1365,25 +1300,24 @@ CREATE INDEX idx_processing_job_segment
 ## 16. Principes définitifs
 
 1.  Les fichiers sources sont immuables.
-2.  Les `TechnicalSegment` sont des fenêtres temporelles de traitement.
+2.  Silence et ASR travaillent sur l'audio complet (pas de TechnicalSegment).
 3.  L'audio est extrait une seule fois.
-4.  Silence et transcription sont parallélisés.
-5.  La transcription utilise un overlap entre chunks.
-6.  Les transcripts partiels sont fusionnés en un transcript global.
-7.  L'analyse virale travaille sur le transcript global.
-8.  Les moments viraux sont déterminés avant le rendu.
-9.  La Timeline est la source de vérité.
-10. `SourceTime` et `OutputTime` sont distincts.
-11. ASS/SRT sont générés après remapping sur la timeline finale.
-12. L'utilisateur valide avant le rendu coûteux.
-13. Crop, scale, ASS et overlays sont appliqués dans un seul pipeline
+4.  Silence et transcription sont parallélisés (fan-out outbox).
+5.  Un seul transcript global par média (AssemblyAI → SRT → ASS).
+6.  L'analyse virale travaille sur le transcript global.
+7.  Les moments viraux sont déterminés avant le rendu.
+8.  La Timeline est la source de vérité.
+9.  `SourceTime` et `OutputTime` sont distincts.
+10. ASS/SRT de montage sont générés après remapping sur la timeline finale.
+11. L'utilisateur valide avant le rendu coûteux.
+12. Crop, scale, ASS et overlays sont appliqués dans un seul pipeline
     FFmpeg.
-14. Un Master ne subit idéalement qu'un seul réencodage.
-15. Les keyframes des clips viraux peuvent être forcées pendant le
+13. Un Master ne subit idéalement qu'un seul réencodage.
+14. Les keyframes des clips viraux peuvent être forcées pendant le
     Master Render.
-16. Les clips compatibles avec le Master sont extraits en `stream copy`.
-17. Un nouveau rendu n'est effectué que lorsque le clip demande un
+15. Les clips compatibles avec le Master sont extraits en `stream copy`.
+16. Un nouveau rendu n'est effectué que lorsque le clip demande un
     format ou un style différent.
-18. Plusieurs sorties indépendantes peuvent être traitées en parallèle.
-19. Le coût principal du système est exprimé en **minutes transcrites +
+17. Plusieurs sorties indépendantes peuvent être traitées en parallèle.
+18. Le coût principal du système est exprimé en **minutes transcrites +
     minutes rendues**.

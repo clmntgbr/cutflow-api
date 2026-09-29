@@ -9,8 +9,9 @@ const (
 	EventTypeMediaFileThumbnailReady = "media_file.thumbnail_ready.v1"
 	EventTypeMediaFileProbing        = "media_file.probing.v1"
 	EventTypeMediaFileReady          = "media_file.ready.v1"
-	EventTypeMediaFileProbeFailed    = "media_file.probe_failed.v1"
-	EventTypeMediaFileSegmentsReady  = "media_file.segments_ready.v1"
+	EventTypeMediaFileProbeFailed         = "media_file.probe_failed.v1"
+	EventTypeMediaFileSilenceRequested    = "media_file.silence_requested.v1"
+	EventTypeMediaFileTranscriptRequested = "media_file.transcript_requested.v1"
 )
 
 type MediaFileCreated struct {
@@ -126,18 +127,30 @@ func (e MediaFileProbeFailed) EventType() string     { return EventTypeMediaFile
 func (e MediaFileProbeFailed) AggregateID() string   { return e.MediaFileID }
 func (e MediaFileProbeFailed) OccurredAt() time.Time { return e.Timestamp }
 
-type MediaFileSegmentsReady struct {
-	ID           string    `json:"eventId"`
-	MediaFileID  string    `json:"mediaFileId"`
-	ProjectID    string    `json:"projectId"`
-	UserID       string    `json:"userId"`
-	SegmentCount int       `json:"segmentCount"`
-	DurationMs   int64     `json:"durationMs"`
-	HasAudio     bool      `json:"hasAudio"`
-	Timestamp    time.Time `json:"timestamp"`
+type MediaFileSilenceRequested struct {
+	ID          string    `json:"eventId"`
+	MediaFileID string    `json:"mediaFileId"`
+	ProjectID   string    `json:"projectId"`
+	UserID      string    `json:"userId"`
+	AudioKey    string    `json:"audioKey"`
+	Timestamp   time.Time `json:"timestamp"`
 }
 
-func (e MediaFileSegmentsReady) EventID() string       { return e.ID }
-func (e MediaFileSegmentsReady) EventType() string     { return EventTypeMediaFileSegmentsReady }
-func (e MediaFileSegmentsReady) AggregateID() string   { return e.MediaFileID }
-func (e MediaFileSegmentsReady) OccurredAt() time.Time { return e.Timestamp }
+func (e MediaFileSilenceRequested) EventID() string       { return e.ID }
+func (e MediaFileSilenceRequested) EventType() string     { return EventTypeMediaFileSilenceRequested }
+func (e MediaFileSilenceRequested) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileSilenceRequested) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaFileTranscriptRequested struct {
+	ID          string    `json:"eventId"`
+	MediaFileID string    `json:"mediaFileId"`
+	ProjectID   string    `json:"projectId"`
+	UserID      string    `json:"userId"`
+	AudioKey    string    `json:"audioKey"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
+func (e MediaFileTranscriptRequested) EventID() string       { return e.ID }
+func (e MediaFileTranscriptRequested) EventType() string     { return EventTypeMediaFileTranscriptRequested }
+func (e MediaFileTranscriptRequested) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileTranscriptRequested) OccurredAt() time.Time { return e.Timestamp }

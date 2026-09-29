@@ -16,8 +16,10 @@ func Models() []any {
 		&write.UserModel{},
 		&write.ProjectModel{},
 		&write.MediaFileModel{},
-		&write.SegmentModel{},
 		&write.MediaAudioModel{},
+		&write.DetectedSilenceModel{},
+		&write.TranscriptModel{},
+		&write.TranscriptWordModel{},
 		&outbox.OutboxEvent{},
 		&processed.ProcessedEvent{},
 	}
