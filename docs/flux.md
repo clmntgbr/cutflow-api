@@ -53,13 +53,14 @@
 │ transcript                  │    │      ↓                      │
 │ + timestamps par mot        │    │ noise floor                │
 │   (SOURCE TIME)             │    │ threshold Auto              │
-│ + confidence                │    │ DetectedSilence[]           │
+│ + confidence                │    │ DetectedSilence[] (brut)    │
+│                             │    │ SourceTime                  │
 │                             │    │                             │
-│ Stocke :                    │    │                             │
-│ • transcript                │    │                             │
+│ Stocke :                    │    │ noise_floor_db              │
+│ • transcript                │    │ calculated_threshold_db     │
 │ • transcript_word           │    │                             │
-│ • SRT source (toujours)     │    │                             │
-│                             │    │                             │
+│ • SRT source (toujours)     │    │ Filtres (min / paddings)    │
+│                             │    │ → plus tard EditDecision    │
 │ PAS d'ASS final ici         │    │                             │
 │ (après Timeline)            │    │                             │
 │ TranscriptWord[]            │    │                             │

@@ -239,23 +239,24 @@ de GPU ni d'IA à cette étape.
   ---------------------------------------------------------------------------
   Paramètre                   Rôle                    Défaut proposé
   --------------------------- ----------------------- -----------------------
-  `silence_threshold_db`      Niveau sous lequel on   -35 dB
-                              considère qu'il y a     
-                              silence                 
+  `silence_threshold_db`      Niveau sous lequel on   -35 dB (manuel) /
+                              considère qu'il y a     auto = noise floor +
+                              silence                 offset niveau
 
-  `min_silence_duration_ms`   Écart minimum pour      400 ms
-                              qu'un blanc soit coupé  
+  `min_silence_duration_ms`   Filtre post-analyse :   500 ms
+                              blanc minimum coupé     
 
-  `pre_roll_ms`               Marge conservée avant   100 ms
+  `padding_before_ms`         Marge conservée avant   50 ms
                               la reprise de parole    
 
-  `post_roll_ms`              Marge conservée après   150 ms
+  `padding_after_ms`          Marge conservée après   150 ms
                               la fin de parole        
   ---------------------------------------------------------------------------
 
-Le pré/post-roll évite les coupes « sèches » qui rognent le début ou la
-fin des mots : c'est le réglage qui fait la différence entre un montage
-naturel et un montage haché.
+La détection ffmpeg stocke des silences **bruts** (plancher 50 ms). Min
+durée et paddings sont appliqués ensuite (`ApplyEditFilters`) sans
+relancer l'analyse. Le pré/post-roll évite les coupes « sèches » qui
+rognent le début ou la fin des mots.
 
 ### 5.2 Transcription mot par mot
 
@@ -684,16 +685,21 @@ EDIT DECISIONS → TIMELINE → preview
 Le worker silence lit la config :
 
 - `threshold_mode=auto` → `volumedetect` (noise floor) + offset selon
-  `silence_detection_level` → `calculated_silence_threshold_db` ;
+  `silence_detection_level` → stocke `noise_floor_db` et
+  `calculated_silence_threshold_db` ;
 - `manual` → `silence_threshold_db` ;
-- `silence_min_duration_ms` pour ffmpeg `silencedetect`.
+- détection brute avec un plancher d'analyse fixe (`AnalysisMinSilenceMs`,
+  50 ms) → `DetectedSilence[]` en **SourceTime**.
 
-Les paddings et `speech_min_duration_ms` s'appliquent plus tard au
-recalcul `EditDecision` / Timeline (pas à la détection brute).
+Les filtres produit (`silence_min_duration_ms`, paddings before/after)
+s'appliquent **après** via `silence.ApplyEditFilters` au recalcul
+`EditDecision` / Timeline — sans relancer ffmpeg quand les silences
+bruts suffisent. `speech_min_duration_ms` s'applique ensuite sur les
+segments de parole conservés.
 
-Changer un filtre (min silence, paddings…) ne relance pas AssemblyAI :
-on recalcule les décisions. Changer le seuil dB / l'agressivité peut
-relancer uniquement `SilenceDetection`.
+Changer min silence / paddings → recalcul des décisions uniquement.
+Changer le seuil dB / l'agressivité / le mode → relancer
+`SilenceDetection` (les silences bruts dépendent du seuil).
 
 ### 14.3 Transcript global (full-file)
 

@@ -34,7 +34,7 @@ func (d *SilenceDetector) Detect(
 	}
 	minDurationSec := float64(minDurationMs) / 1000
 	if minDurationSec <= 0 {
-		minDurationSec = 0.4
+		minDurationSec = 0.05
 	}
 
 	filter := fmt.Sprintf("silencedetect=noise=%.1fdB:d=%.3f", thresholdDB, minDurationSec)

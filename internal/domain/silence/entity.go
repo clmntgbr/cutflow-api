@@ -12,6 +12,13 @@ type Interval struct {
 	EndMs   int64
 }
 
+func (i Interval) DurationMs() int64 {
+	if i.EndMs <= i.StartMs {
+		return 0
+	}
+	return i.EndMs - i.StartMs
+}
+
 type DetectedSilence struct {
 	ID          uuid.UUID
 	MediaFileID uuid.UUID
@@ -28,6 +35,14 @@ func NewDetectedSilence(mediaFileID uuid.UUID, startMs, endMs int64) *DetectedSi
 		EndMs:       endMs,
 		CreatedAt:   time.Now().UTC(),
 	}
+}
+
+func (s *DetectedSilence) DurationMs() int64 {
+	return Interval{StartMs: s.StartMs, EndMs: s.EndMs}.DurationMs()
+}
+
+func (s *DetectedSilence) Interval() Interval {
+	return Interval{StartMs: s.StartMs, EndMs: s.EndMs}
 }
 
 type DetectedSilenceWriteRepository interface {

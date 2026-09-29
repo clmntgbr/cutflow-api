@@ -2,6 +2,7 @@ package mediafile
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -104,30 +105,41 @@ func (h *DetectSilenceHandler) Handle(ctx context.Context, cmd DetectSilenceComm
 		return messaging.Retryable(err)
 	}
 
-	thresholdDB, err := h.resolveThreshold(ctx, tmp.Name(), cfg)
+	thresholdDB, noiseFloorDB, err := h.resolveThreshold(ctx, tmp.Name(), cfg)
 	if err != nil {
 		if failErr := h.fail(ctx, cmd.JobID, "silence detection failed"); failErr != nil {
 			return failErr
 		}
 		return messaging.NonRetryable(err)
+	}
+
+	// Capture raw silences with an analysis floor. Config min duration + paddings
+	// are applied later via silence.ApplyEditFilters (EditDecision / Timeline).
+	intervals, err := h.detector.Detect(ctx, tmp.Name(), thresholdDB, domainsilence.AnalysisMinSilenceMs)
+	if err != nil {
+		if failErr := h.fail(ctx, cmd.JobID, "silence detection failed"); failErr != nil {
+			return failErr
+		}
+		return messaging.NonRetryable(err)
+	}
+
+	if noiseFloorDB != nil {
+		cfg.SetNoiseFloor(*noiseFloorDB)
+	} else {
+		cfg.ClearNoiseFloor()
 	}
 	cfg.SetCalculatedThreshold(thresholdDB)
 	if err := h.configRepo.Update(ctx, cfg); err != nil {
 		return messaging.Retryable(err)
 	}
 
-	minDurationMs := int64(cfg.SilenceMinDurationMs)
-	intervals, err := h.detector.Detect(ctx, tmp.Name(), thresholdDB, minDurationMs)
-	if err != nil {
-		if failErr := h.fail(ctx, cmd.JobID, "silence detection failed"); failErr != nil {
-			return failErr
-		}
-		return messaging.NonRetryable(err)
+	noiseFloorLog := "n/a"
+	if noiseFloorDB != nil {
+		noiseFloorLog = fmt.Sprintf("%.1f", *noiseFloorDB)
 	}
-
 	log.Printf(
-		"silence detected mediaFileId=%s threshold=%.1fdB minDurationMs=%d count=%d level=%s",
-		cmd.MediaFileID, thresholdDB, minDurationMs, len(intervals), cfg.SilenceDetectionLevel,
+		"silence detected mediaFileId=%s noiseFloor=%sdB threshold=%.1fdB analysisMinMs=%d count=%d level=%s",
+		cmd.MediaFileID, noiseFloorLog, thresholdDB, domainsilence.AnalysisMinSilenceMs, len(intervals), cfg.SilenceDetectionLevel,
 	)
 	return h.persistResults(ctx, cmd, intervals)
 }
@@ -136,17 +148,20 @@ func (h *DetectSilenceHandler) resolveThreshold(
 	ctx context.Context,
 	audioPath string,
 	cfg *domainmediaconfig.MediaConfiguration,
-) (float64, error) {
+) (float64, *float64, error) {
 	if cfg.SilenceThresholdMode == domainmediaconfig.ThresholdModeManual && cfg.SilenceThresholdDB != nil {
-		return *cfg.SilenceThresholdDB, nil
+		return *cfg.SilenceThresholdDB, nil, nil
 	}
 	noiseFloor, err := h.noiseFloor.Analyze(ctx, audioPath)
 	if err != nil {
-		// Fallback when analysis fails: aggressive default around -35 dB.
+		// Fallback when analysis fails: assume -45 dBFS floor so threshold stays
+		// reproducible, and still persist that assumed floor.
 		log.Printf("noise floor analysis failed, using fallback: %v", err)
-		return cfg.ResolveSilenceThreshold(-45), nil
+		fallback := -45.0
+		return cfg.ResolveSilenceThreshold(fallback), &fallback, nil
 	}
-	return cfg.ResolveSilenceThreshold(noiseFloor), nil
+	nf := noiseFloor
+	return cfg.ResolveSilenceThreshold(noiseFloor), &nf, nil
 }
 
 func (h *DetectSilenceHandler) persistResults(

@@ -14,6 +14,7 @@ type MediaConfigurationModel struct {
 	SilenceRemovalEnabled        bool      `gorm:"column:silence_removal_enabled"`
 	SilenceThresholdMode         string    `gorm:"column:silence_threshold_mode"`
 	SilenceThresholdDB           *float64  `gorm:"column:silence_threshold_db"`
+	NoiseFloorDB                 *float64  `gorm:"column:noise_floor_db"`
 	CalculatedSilenceThresholdDB *float64  `gorm:"column:calculated_silence_threshold_db"`
 	SilenceDetectionLevel        string    `gorm:"column:silence_detection_level"`
 	SilencePaddingBeforeMs       int       `gorm:"column:silence_padding_before_ms"`
@@ -40,6 +41,7 @@ func mediaConfigurationModelFromDomain(c *domainmediaconfig.MediaConfiguration) 
 		SilenceRemovalEnabled:        c.SilenceRemovalEnabled,
 		SilenceThresholdMode:         c.SilenceThresholdMode,
 		SilenceThresholdDB:           c.SilenceThresholdDB,
+		NoiseFloorDB:                 c.NoiseFloorDB,
 		CalculatedSilenceThresholdDB: c.CalculatedSilenceThresholdDB,
 		SilenceDetectionLevel:        c.SilenceDetectionLevel,
 		SilencePaddingBeforeMs:       c.SilencePaddingBeforeMs,
@@ -65,6 +67,7 @@ func mediaConfigurationDomainFromModel(m *MediaConfigurationModel) *domainmediac
 		SilenceRemovalEnabled:        m.SilenceRemovalEnabled,
 		SilenceThresholdMode:         m.SilenceThresholdMode,
 		SilenceThresholdDB:           m.SilenceThresholdDB,
+		NoiseFloorDB:                 m.NoiseFloorDB,
 		CalculatedSilenceThresholdDB: m.CalculatedSilenceThresholdDB,
 		SilenceDetectionLevel:        m.SilenceDetectionLevel,
 		SilencePaddingBeforeMs:       m.SilencePaddingBeforeMs,

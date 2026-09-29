@@ -47,6 +47,7 @@ type MediaConfiguration struct {
 	SilenceRemovalEnabled         bool
 	SilenceThresholdMode          string
 	SilenceThresholdDB            *float64
+	NoiseFloorDB                  *float64
 	CalculatedSilenceThresholdDB  *float64
 	SilenceDetectionLevel         string
 	SilencePaddingBeforeMs        int
@@ -110,6 +111,16 @@ func (c *MediaConfiguration) ResolveSilenceThreshold(noiseFloorDB float64) float
 
 func (c *MediaConfiguration) SetCalculatedThreshold(db float64) {
 	c.CalculatedSilenceThresholdDB = &db
+	c.UpdatedAt = time.Now().UTC()
+}
+
+func (c *MediaConfiguration) SetNoiseFloor(db float64) {
+	c.NoiseFloorDB = &db
+	c.UpdatedAt = time.Now().UTC()
+}
+
+func (c *MediaConfiguration) ClearNoiseFloor() {
+	c.NoiseFloorDB = nil
 	c.UpdatedAt = time.Now().UTC()
 }
 
