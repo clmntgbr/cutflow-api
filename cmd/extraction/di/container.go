@@ -47,6 +47,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	extractAudioHandler := cmdmediafile.NewExtractAudioHandler(
 		write.NewMediaFileWriteRepository(db),
 		write.NewMediaAudioWriteRepository(db),
+		write.NewJobWriteRepository(db),
 		minioStorage,
 		inframedia.NewAudioExtractor(),
 		outboxRepo,

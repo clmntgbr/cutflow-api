@@ -20,6 +20,7 @@ func Models() []any {
 		&write.DetectedSilenceModel{},
 		&write.TranscriptModel{},
 		&write.TranscriptWordModel{},
+		&write.JobModel{},
 		&outbox.OutboxEvent{},
 		&processed.ProcessedEvent{},
 	}

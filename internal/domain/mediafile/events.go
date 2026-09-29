@@ -132,6 +132,7 @@ type MediaFileSilenceRequested struct {
 	MediaFileID string    `json:"mediaFileId"`
 	ProjectID   string    `json:"projectId"`
 	UserID      string    `json:"userId"`
+	JobID       string    `json:"jobId"`
 	AudioKey    string    `json:"audioKey"`
 	Timestamp   time.Time `json:"timestamp"`
 }
@@ -146,6 +147,7 @@ type MediaFileTranscriptRequested struct {
 	MediaFileID string    `json:"mediaFileId"`
 	ProjectID   string    `json:"projectId"`
 	UserID      string    `json:"userId"`
+	JobID       string    `json:"jobId"`
 	AudioKey    string    `json:"audioKey"`
 	Timestamp   time.Time `json:"timestamp"`
 }

@@ -18,6 +18,7 @@ func main() {
 	rootCmd.AddCommand(
 		cliCommand.NewMigrateCommand(),
 		cliCommand.NewPurgeCommand(),
+		cliCommand.NewPurgeStorageCommand(),
 	)
 
 	if err := rootCmd.Execute(); err != nil {

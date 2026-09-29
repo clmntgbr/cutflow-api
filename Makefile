@@ -8,7 +8,7 @@ dev:
 	$(COMPOSE_DEV) up -d
 
 restart:
-	$(COMPOSE_DEV) restart worker api extraction
+	$(COMPOSE_DEV) restart worker api extraction silence transcript
 
 build:
 	$(COMPOSE_DEV) up -d --build
@@ -17,7 +17,7 @@ dev-down:
 	$(COMPOSE_DEV) down
 
 dev-logs:
-	$(COMPOSE_DEV) logs -f api worker extraction
+	$(COMPOSE_DEV) logs -f api worker extraction silence transcript
 
 api-logs:
 	$(COMPOSE_DEV) logs -f api
@@ -29,7 +29,7 @@ extraction-logs:
 	$(COMPOSE_DEV) logs -f extraction
 
 dev-restart:
-	$(COMPOSE_DEV) restart api worker extraction
+	$(COMPOSE_DEV) restart api worker extraction silence transcript
 
 lint:
 	$(COMPOSE_DEV) exec api golangci-lint run --fix
@@ -71,6 +71,9 @@ migrate-check: cli-build
 
 purge: cli-build
 	@$(COMPOSE_DEV) exec api ./bin/cli purge --yes
+
+purge-storage: cli-build
+	@$(COMPOSE_DEV) exec api ./bin/cli purge-storage --yes
 
 shell:
 	$(COMPOSE_DEV) exec api sh

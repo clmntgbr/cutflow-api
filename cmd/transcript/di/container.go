@@ -46,6 +46,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	dedupRepo := processed.NewRepository(db)
 	transcribeHandler := cmdmediafile.NewTranscribeAudioHandler(
 		write.NewTranscriptWriteRepository(db),
+		write.NewJobWriteRepository(db),
 		minioStorage,
 		assemblyai.NewClient(env.AssemblyAIAPIKey),
 		outboxRepo,

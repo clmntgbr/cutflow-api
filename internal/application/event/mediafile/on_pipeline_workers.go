@@ -37,13 +37,21 @@ func (h *DetectSilenceOnRequestedHandler) Handle(ctx context.Context, payload []
 	if err != nil {
 		return messaging.NonRetryable(err)
 	}
+	jobID := uuid.Nil
+	if evt.JobID != "" {
+		jobID, err = uuid.Parse(evt.JobID)
+		if err != nil {
+			return messaging.NonRetryable(err)
+		}
+	}
 
-	log.Printf("silence worker received mediaFileId=%s", evt.MediaFileID)
+	log.Printf("silence worker received mediaFileId=%s jobId=%s", evt.MediaFileID, evt.JobID)
 	return h.detect.Handle(ctx, cmdmediafile.DetectSilenceCommand{
 		MediaFileID: mediaFileID,
 		AudioKey:    evt.AudioKey,
 		ProjectID:   projectID,
 		UserID:      userID,
+		JobID:       jobID,
 	})
 }
 
@@ -74,13 +82,21 @@ func (h *TranscribeAudioOnRequestedHandler) Handle(ctx context.Context, payload 
 	if err != nil {
 		return messaging.NonRetryable(err)
 	}
+	jobID := uuid.Nil
+	if evt.JobID != "" {
+		jobID, err = uuid.Parse(evt.JobID)
+		if err != nil {
+			return messaging.NonRetryable(err)
+		}
+	}
 
-	log.Printf("transcript worker received mediaFileId=%s", evt.MediaFileID)
+	log.Printf("transcript worker received mediaFileId=%s jobId=%s", evt.MediaFileID, evt.JobID)
 	return h.transcribe.Handle(ctx, cmdmediafile.TranscribeAudioCommand{
 		MediaFileID: mediaFileID,
 		AudioKey:    evt.AudioKey,
 		ProjectID:   projectID,
 		UserID:      userID,
+		JobID:       jobID,
 	})
 }
 

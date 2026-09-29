@@ -6,10 +6,12 @@ import (
 
 	cmdmediafile "go-api/internal/application/command/mediafile"
 	"go-api/internal/application/event/dedup"
+	eventjob "go-api/internal/application/event/job"
 	eventmediafile "go-api/internal/application/event/mediafile"
 	eventproject "go-api/internal/application/event/project"
 	eventuser "go-api/internal/application/event/user"
 	"go-api/internal/application/registry"
+	domainjob "go-api/internal/domain/job"
 	domainmediaaudio "go-api/internal/domain/mediaaudio"
 	domainmediafile "go-api/internal/domain/mediafile"
 	domainproject "go-api/internal/domain/project"
@@ -66,6 +68,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	publishUserRealtime := eventuser.NewPublishRealtimeHandler(realtimePublisher)
 	publishMediaRealtime := eventmediafile.NewPublishRealtimeHandler(realtimePublisher)
 	publishProjectRealtime := eventproject.NewPublishRealtimeHandler(realtimePublisher)
+	publishJobRealtime := eventjob.NewPublishRealtimeHandler(realtimePublisher)
 
 	generateThumbnailHandler := cmdmediafile.NewGenerateThumbnailHandler(
 		mediaFileWriteRepo,
@@ -185,6 +188,16 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo,
 		"publish_project_updated_realtime",
 		publishProjectRealtime.OnUpdated,
+	))
+	reg.Register(domainjob.EventTypeJobCreated, dedup.With(
+		dedupRepo,
+		"publish_job_created_realtime",
+		publishJobRealtime.OnCreated,
+	))
+	reg.Register(domainjob.EventTypeJobStatusChanged, dedup.With(
+		dedupRepo,
+		"publish_job_status_changed_realtime",
+		publishJobRealtime.OnStatusChanged,
 	))
 
 	consumer := rabbitmq.NewConsumer(conn, reg, env.WorkerConcurrency, env.WorkerMaxRetries)

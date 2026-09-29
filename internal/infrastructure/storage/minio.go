@@ -12,6 +12,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type MinIOStorage struct {
@@ -96,6 +97,63 @@ func (s *MinIOStorage) Delete(ctx context.Context, key string) error {
 		return fmt.Errorf("failed to delete object: %w", err)
 	}
 	return nil
+}
+
+// DeleteAllObjects removes every object in the configured bucket. Returns the number deleted.
+func (s *MinIOStorage) DeleteAllObjects(ctx context.Context) (int, error) {
+	deleted := 0
+	var continuationToken *string
+
+	for {
+		listOut, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+			Bucket:            aws.String(s.bucket),
+			ContinuationToken: continuationToken,
+		})
+		if err != nil {
+			return deleted, fmt.Errorf("list objects: %w", err)
+		}
+		if len(listOut.Contents) == 0 {
+			break
+		}
+
+		objects := make([]s3types.ObjectIdentifier, 0, len(listOut.Contents))
+		for _, obj := range listOut.Contents {
+			if obj.Key == nil {
+				continue
+			}
+			objects = append(objects, s3types.ObjectIdentifier{Key: obj.Key})
+		}
+		if len(objects) == 0 {
+			break
+		}
+
+		delOut, err := s.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+			Bucket: aws.String(s.bucket),
+			Delete: &s3types.Delete{
+				Objects: objects,
+				Quiet:   aws.Bool(true),
+			},
+		})
+		if err != nil {
+			return deleted, fmt.Errorf("delete objects: %w", err)
+		}
+		deleted += len(objects) - len(delOut.Errors)
+		if len(delOut.Errors) > 0 {
+			first := delOut.Errors[0]
+			return deleted, fmt.Errorf(
+				"delete objects partial failure key=%s: %s",
+				aws.ToString(first.Key),
+				aws.ToString(first.Message),
+			)
+		}
+
+		if !aws.ToBool(listOut.IsTruncated) {
+			break
+		}
+		continuationToken = listOut.NextContinuationToken
+	}
+
+	return deleted, nil
 }
 
 func (s *MinIOStorage) PresignedPutURL(ctx context.Context, key string, expiry time.Duration) (string, error) {

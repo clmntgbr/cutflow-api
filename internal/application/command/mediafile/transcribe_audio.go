@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"go-api/internal/application/messaging"
+	domainjob "go-api/internal/domain/job"
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
 	domaintranscript "go-api/internal/domain/transcript"
@@ -20,10 +21,12 @@ type TranscribeAudioCommand struct {
 	AudioKey    string
 	ProjectID   uuid.UUID
 	UserID      uuid.UUID
+	JobID       uuid.UUID
 }
 
 type TranscribeAudioHandler struct {
 	transcriptRepo domaintranscript.TranscriptWriteRepository
+	jobRepo        domainjob.JobWriteRepository
 	storage        port.Storage
 	transcriber    port.SpeechTranscriber
 	outbox         port.OutboxRepository
@@ -31,12 +34,14 @@ type TranscribeAudioHandler struct {
 
 func NewTranscribeAudioHandler(
 	transcriptRepo domaintranscript.TranscriptWriteRepository,
+	jobRepo domainjob.JobWriteRepository,
 	storage port.Storage,
 	transcriber port.SpeechTranscriber,
 	outbox port.OutboxRepository,
 ) *TranscribeAudioHandler {
 	return &TranscribeAudioHandler{
 		transcriptRepo: transcriptRepo,
+		jobRepo:        jobRepo,
 		storage:        storage,
 		transcriber:    transcriber,
 		outbox:         outbox,
@@ -44,12 +49,16 @@ func NewTranscribeAudioHandler(
 }
 
 func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudioCommand) error {
+	if err := h.markProcessing(ctx, cmd.JobID); err != nil {
+		return err
+	}
+
 	existing, err := h.transcriptRepo.GetByMediaFileID(ctx, cmd.MediaFileID)
 	if err != nil {
 		return messaging.Retryable(err)
 	}
 	if existing != nil && existing.Status == domaintranscript.StatusCompleted {
-		return nil
+		return h.succeedJob(ctx, cmd.JobID)
 	}
 
 	transcript := existing
@@ -83,7 +92,7 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 	result, err := h.transcriber.Transcribe(ctx, tmp.Name())
 	if err != nil {
 		log.Printf("transcription failed mediaFileId=%s: %v", cmd.MediaFileID, err)
-		if failErr := h.fail(ctx, cmd.MediaFileID, "transcription failed"); failErr != nil {
+		if failErr := h.fail(ctx, cmd.MediaFileID, cmd.JobID, "transcription failed"); failErr != nil {
 			return failErr
 		}
 		return messaging.NonRetryable(err)
@@ -109,12 +118,52 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 		})
 	}
 
-	return h.complete(ctx, cmd.MediaFileID, result.ProviderJobID, result.Language, result.Text, words)
+	return h.complete(ctx, cmd.MediaFileID, cmd.JobID, result.ProviderJobID, result.Language, result.Text, words)
+}
+
+func (h *TranscribeAudioHandler) markProcessing(ctx context.Context, jobID uuid.UUID) error {
+	if jobID == uuid.Nil {
+		return nil
+	}
+	return h.jobRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+		job, err := h.jobRepo.GetByID(txCtx, jobID)
+		if err != nil {
+			return messaging.Retryable(err)
+		}
+		if job == nil || job.Status == domainjob.StatusSuccess || job.Status == domainjob.StatusProcessing {
+			return nil
+		}
+		job.MarkProcessing()
+		if err := h.jobRepo.Update(txCtx, job); err != nil {
+			return messaging.Retryable(err)
+		}
+		return h.outbox.StoreEvents(txCtx, job.PullEvents())
+	})
+}
+
+func (h *TranscribeAudioHandler) succeedJob(ctx context.Context, jobID uuid.UUID) error {
+	if jobID == uuid.Nil {
+		return nil
+	}
+	return h.jobRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+		job, err := h.jobRepo.GetByID(txCtx, jobID)
+		if err != nil {
+			return messaging.Retryable(err)
+		}
+		if job == nil || job.Status == domainjob.StatusSuccess {
+			return nil
+		}
+		job.MarkSuccess()
+		if err := h.jobRepo.Update(txCtx, job); err != nil {
+			return messaging.Retryable(err)
+		}
+		return h.outbox.StoreEvents(txCtx, job.PullEvents())
+	})
 }
 
 func (h *TranscribeAudioHandler) complete(
 	ctx context.Context,
-	mediaFileID uuid.UUID,
+	mediaFileID, jobID uuid.UUID,
 	providerJobID, language, text string,
 	words []domaintranscript.Word,
 ) error {
@@ -127,7 +176,7 @@ func (h *TranscribeAudioHandler) complete(
 			return messaging.NonRetryable(domainmediafile.ErrMediaNotFound)
 		}
 		if transcript.Status == domaintranscript.StatusCompleted {
-			return nil
+			return h.succeedJobInTx(txCtx, jobID)
 		}
 		if providerJobID != "" {
 			transcript.MarkProcessing(providerJobID)
@@ -139,11 +188,43 @@ func (h *TranscribeAudioHandler) complete(
 		if err := h.transcriptRepo.ReplaceWords(txCtx, transcript.ID, words); err != nil {
 			return messaging.Retryable(err)
 		}
-		return h.outbox.StoreEvents(txCtx, transcript.PullEvents())
+		events := transcript.PullEvents()
+		if jobID != uuid.Nil {
+			job, err := h.jobRepo.GetByID(txCtx, jobID)
+			if err != nil {
+				return messaging.Retryable(err)
+			}
+			if job != nil && job.Status != domainjob.StatusSuccess {
+				job.MarkSuccess()
+				if err := h.jobRepo.Update(txCtx, job); err != nil {
+					return messaging.Retryable(err)
+				}
+				events = append(events, job.PullEvents()...)
+			}
+		}
+		return h.outbox.StoreEvents(txCtx, events)
 	})
 }
 
-func (h *TranscribeAudioHandler) fail(ctx context.Context, mediaFileID uuid.UUID, reason string) error {
+func (h *TranscribeAudioHandler) succeedJobInTx(ctx context.Context, jobID uuid.UUID) error {
+	if jobID == uuid.Nil {
+		return nil
+	}
+	job, err := h.jobRepo.GetByID(ctx, jobID)
+	if err != nil {
+		return messaging.Retryable(err)
+	}
+	if job == nil || job.Status == domainjob.StatusSuccess {
+		return nil
+	}
+	job.MarkSuccess()
+	if err := h.jobRepo.Update(ctx, job); err != nil {
+		return messaging.Retryable(err)
+	}
+	return h.outbox.StoreEvents(ctx, job.PullEvents())
+}
+
+func (h *TranscribeAudioHandler) fail(ctx context.Context, mediaFileID, jobID uuid.UUID, reason string) error {
 	return h.transcriptRepo.WithTransaction(ctx, func(txCtx context.Context) error {
 		transcript, err := h.transcriptRepo.GetByMediaFileID(txCtx, mediaFileID)
 		if err != nil {
@@ -152,13 +233,27 @@ func (h *TranscribeAudioHandler) fail(ctx context.Context, mediaFileID uuid.UUID
 		if transcript == nil {
 			return messaging.NonRetryable(domainmediafile.ErrMediaNotFound)
 		}
-		if transcript.Status == domaintranscript.StatusFailed {
-			return nil
+
+		if transcript.Status != domaintranscript.StatusFailed {
+			transcript.MarkFailed(reason)
+			if err := h.transcriptRepo.Update(txCtx, transcript); err != nil {
+				return messaging.Retryable(err)
+			}
 		}
-		transcript.MarkFailed(reason)
-		if err := h.transcriptRepo.Update(txCtx, transcript); err != nil {
-			return messaging.Retryable(err)
+		domainEvents := transcript.PullEvents()
+		if jobID != uuid.Nil {
+			job, err := h.jobRepo.GetByID(txCtx, jobID)
+			if err != nil {
+				return messaging.Retryable(err)
+			}
+			if job != nil && job.Status != domainjob.StatusFailed {
+				job.MarkFailed(reason)
+				if err := h.jobRepo.Update(txCtx, job); err != nil {
+					return messaging.Retryable(err)
+				}
+				domainEvents = append(domainEvents, job.PullEvents()...)
+			}
 		}
-		return h.outbox.StoreEvents(txCtx, transcript.PullEvents())
+		return h.outbox.StoreEvents(txCtx, domainEvents)
 	})
 }
