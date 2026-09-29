@@ -7,6 +7,9 @@ const (
 	EventTypeMediaFileUploaded       = "media_file.uploaded.v1"
 	EventTypeMediaFileUploadExpired  = "media_file.upload_expired.v1"
 	EventTypeMediaFileThumbnailReady = "media_file.thumbnail_ready.v1"
+	EventTypeMediaFileProbing        = "media_file.probing.v1"
+	EventTypeMediaFileReady          = "media_file.ready.v1"
+	EventTypeMediaFileProbeFailed    = "media_file.probe_failed.v1"
 )
 
 type MediaFileCreated struct {
@@ -69,3 +72,55 @@ func (e MediaFileThumbnailReady) EventID() string       { return e.ID }
 func (e MediaFileThumbnailReady) EventType() string     { return EventTypeMediaFileThumbnailReady }
 func (e MediaFileThumbnailReady) AggregateID() string   { return e.MediaFileID }
 func (e MediaFileThumbnailReady) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaFileProbing struct {
+	ID          string    `json:"eventId"`
+	MediaFileID string    `json:"mediaFileId"`
+	ProjectID   string    `json:"projectId"`
+	UserID      string    `json:"userId"`
+	Status      string    `json:"status"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
+func (e MediaFileProbing) EventID() string       { return e.ID }
+func (e MediaFileProbing) EventType() string     { return EventTypeMediaFileProbing }
+func (e MediaFileProbing) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileProbing) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaFileReady struct {
+	ID              string    `json:"eventId"`
+	MediaFileID     string    `json:"mediaFileId"`
+	ProjectID       string    `json:"projectId"`
+	UserID          string    `json:"userId"`
+	Status          string    `json:"status"`
+	DurationMs      int64     `json:"durationMs"`
+	Width           *int      `json:"width,omitempty"`
+	Height          *int      `json:"height,omitempty"`
+	FPS             *float64  `json:"fps,omitempty"`
+	VideoCodec      string    `json:"videoCodec,omitempty"`
+	AudioCodec      string    `json:"audioCodec,omitempty"`
+	AudioSampleRate *int      `json:"audioSampleRate,omitempty"`
+	AudioChannels   *int      `json:"audioChannels,omitempty"`
+	SizeBytes       int64     `json:"sizeBytes"`
+	Timestamp       time.Time `json:"timestamp"`
+}
+
+func (e MediaFileReady) EventID() string       { return e.ID }
+func (e MediaFileReady) EventType() string     { return EventTypeMediaFileReady }
+func (e MediaFileReady) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileReady) OccurredAt() time.Time { return e.Timestamp }
+
+type MediaFileProbeFailed struct {
+	ID          string    `json:"eventId"`
+	MediaFileID string    `json:"mediaFileId"`
+	ProjectID   string    `json:"projectId"`
+	UserID      string    `json:"userId"`
+	Status      string    `json:"status"`
+	Reason      string    `json:"reason"`
+	Timestamp   time.Time `json:"timestamp"`
+}
+
+func (e MediaFileProbeFailed) EventID() string       { return e.ID }
+func (e MediaFileProbeFailed) EventType() string     { return EventTypeMediaFileProbeFailed }
+func (e MediaFileProbeFailed) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileProbeFailed) OccurredAt() time.Time { return e.Timestamp }

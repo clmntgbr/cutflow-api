@@ -46,6 +46,13 @@ type ProjectMediaFileView struct {
 	MimeType         string
 	SizeBytes        int64
 	DurationMs       int64
+	Width            *int
+	Height           *int
+	FPS              *float64
+	VideoCodec       string
+	AudioCodec       string
+	AudioSampleRate  *int
+	AudioChannels    *int
 	StorageKey       string
 	OriginalURL      string
 	ThumbnailKey     string

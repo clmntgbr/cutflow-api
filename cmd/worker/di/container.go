@@ -72,6 +72,14 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	)
 	onUploadedThumbnail := eventmediafile.NewGenerateThumbnailOnUploadedHandler(generateThumbnailHandler)
 
+	probeMediaHandler := cmdmediafile.NewProbeMediaHandler(
+		mediaFileWriteRepo,
+		minioStorage,
+		inframedia.NewMediaProber(),
+		outboxRepo,
+	)
+	onUploadedProbe := eventmediafile.NewProbeMediaOnUploadedHandler(probeMediaHandler)
+
 	reg := registry.NewHandlerRegistry()
 
 	reg.Register(domainuser.EventTypeUserCreated, dedup.With(
@@ -117,6 +125,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	))
 	reg.Register(domainmediafile.EventTypeMediaFileUploaded, dedup.With(
 		dedupRepo,
+		"probe_media_file_on_uploaded",
+		onUploadedProbe.Handle,
+	))
+	reg.Register(domainmediafile.EventTypeMediaFileUploaded, dedup.With(
+		dedupRepo,
 		"publish_media_file_uploaded_realtime",
 		publishMediaRealtime.OnUploaded,
 	))
@@ -124,6 +137,21 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo,
 		"publish_media_file_thumbnail_ready_realtime",
 		publishMediaRealtime.OnThumbnailReady,
+	))
+	reg.Register(domainmediafile.EventTypeMediaFileProbing, dedup.With(
+		dedupRepo,
+		"publish_media_file_probing_realtime",
+		publishMediaRealtime.OnProbing,
+	))
+	reg.Register(domainmediafile.EventTypeMediaFileReady, dedup.With(
+		dedupRepo,
+		"publish_media_file_ready_realtime",
+		publishMediaRealtime.OnReady,
+	))
+	reg.Register(domainmediafile.EventTypeMediaFileProbeFailed, dedup.With(
+		dedupRepo,
+		"publish_media_file_probe_failed_realtime",
+		publishMediaRealtime.OnProbeFailed,
 	))
 	reg.Register(domainproject.EventTypeProjectUpdated, dedup.With(
 		dedupRepo,

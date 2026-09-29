@@ -22,6 +22,8 @@ type MediaFileModel struct {
 	FPS              *float64  `gorm:"column:fps"`
 	VideoCodec       *string   `gorm:"column:video_codec"`
 	AudioCodec       *string   `gorm:"column:audio_codec"`
+	AudioSampleRate  *int      `gorm:"column:audio_sample_rate"`
+	AudioChannels    *int      `gorm:"column:audio_channels"`
 	SizeBytes        *int64    `gorm:"column:size_bytes"`
 	Status           string    `gorm:"column:status"`
 	CreatedAt        time.Time `gorm:"column:created_at"`
@@ -36,7 +38,7 @@ func mediaFileModelFromDomain(m *domainmediafile.MediaFile) *MediaFileModel {
 	filename := m.OriginalFilename
 	mimeType := m.MimeType
 	sizeBytes := m.SizeBytes
-	return &MediaFileModel{
+	model := &MediaFileModel{
 		ID:               m.ID,
 		ProjectID:        m.ProjectID,
 		UserID:           m.UserID,
@@ -45,24 +47,43 @@ func mediaFileModelFromDomain(m *domainmediafile.MediaFile) *MediaFileModel {
 		OriginalFilename: &filename,
 		MimeType:         &mimeType,
 		DurationMs:       m.DurationMs,
+		Width:            m.Width,
+		Height:           m.Height,
+		FPS:              m.FPS,
+		AudioSampleRate:  m.AudioSampleRate,
+		AudioChannels:    m.AudioChannels,
 		SizeBytes:        &sizeBytes,
 		Status:           m.Status,
 		CreatedAt:        m.CreatedAt,
 		UpdatedAt:        m.UpdatedAt,
 	}
+	if m.VideoCodec != "" {
+		codec := m.VideoCodec
+		model.VideoCodec = &codec
+	}
+	if m.AudioCodec != "" {
+		codec := m.AudioCodec
+		model.AudioCodec = &codec
+	}
+	return model
 }
 
 func mediaFileDomainFromModel(m *MediaFileModel) *domainmediafile.MediaFile {
 	media := &domainmediafile.MediaFile{
-		ID:           m.ID,
-		ProjectID:    m.ProjectID,
-		UserID:       m.UserID,
-		StorageKey:   m.StorageKey,
-		ThumbnailKey: m.ThumbnailKey,
-		DurationMs:   m.DurationMs,
-		Status:       m.Status,
-		CreatedAt:    m.CreatedAt,
-		UpdatedAt:    m.UpdatedAt,
+		ID:              m.ID,
+		ProjectID:       m.ProjectID,
+		UserID:          m.UserID,
+		StorageKey:      m.StorageKey,
+		ThumbnailKey:    m.ThumbnailKey,
+		DurationMs:      m.DurationMs,
+		Width:           m.Width,
+		Height:          m.Height,
+		FPS:             m.FPS,
+		AudioSampleRate: m.AudioSampleRate,
+		AudioChannels:   m.AudioChannels,
+		Status:          m.Status,
+		CreatedAt:       m.CreatedAt,
+		UpdatedAt:       m.UpdatedAt,
 	}
 	if m.OriginalFilename != nil {
 		media.OriginalFilename = *m.OriginalFilename
@@ -72,6 +93,12 @@ func mediaFileDomainFromModel(m *MediaFileModel) *domainmediafile.MediaFile {
 	}
 	if m.SizeBytes != nil {
 		media.SizeBytes = *m.SizeBytes
+	}
+	if m.VideoCodec != nil {
+		media.VideoCodec = *m.VideoCodec
+	}
+	if m.AudioCodec != nil {
+		media.AudioCodec = *m.AudioCodec
 	}
 	return media
 }

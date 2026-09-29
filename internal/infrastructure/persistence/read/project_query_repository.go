@@ -40,6 +40,13 @@ type projectMediaFileRow struct {
 	MimeType         *string
 	SizeBytes        *int64
 	DurationMs       int64
+	Width            *int
+	Height           *int
+	FPS              *float64
+	VideoCodec       *string
+	AudioCodec       *string
+	AudioSampleRate  *int
+	AudioChannels    *int
 	StorageKey       string
 	ThumbnailKey     string
 	Status           string
@@ -78,7 +85,24 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 
 	var mediaRows []projectMediaFileRow
 	err = r.db.WithContext(ctx).
-		Select("id", "original_filename", "mime_type", "size_bytes", "duration_ms", "storage_key", "thumbnail_key", "status", "created_at").
+		Select(
+			"id",
+			"original_filename",
+			"mime_type",
+			"size_bytes",
+			"duration_ms",
+			"width",
+			"height",
+			"fps",
+			"video_codec",
+			"audio_codec",
+			"audio_sample_rate",
+			"audio_channels",
+			"storage_key",
+			"thumbnail_key",
+			"status",
+			"created_at",
+		).
 		Where("project_id = ?", id).
 		Order("created_at ASC").
 		Find(&mediaRows).Error
@@ -89,12 +113,17 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 	mediaFiles := make([]domainproject.ProjectMediaFileView, 0, len(mediaRows))
 	for _, media := range mediaRows {
 		view := domainproject.ProjectMediaFileView{
-			ID:           media.ID,
-			DurationMs:   media.DurationMs,
-			StorageKey:   media.StorageKey,
-			ThumbnailKey: media.ThumbnailKey,
-			Status:       media.Status,
-			CreatedAt:    media.CreatedAt,
+			ID:              media.ID,
+			DurationMs:      media.DurationMs,
+			Width:           media.Width,
+			Height:          media.Height,
+			FPS:             media.FPS,
+			AudioSampleRate: media.AudioSampleRate,
+			AudioChannels:   media.AudioChannels,
+			StorageKey:      media.StorageKey,
+			ThumbnailKey:    media.ThumbnailKey,
+			Status:          media.Status,
+			CreatedAt:       media.CreatedAt,
 		}
 		if media.OriginalFilename != nil {
 			view.OriginalFilename = *media.OriginalFilename
@@ -104,6 +133,12 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 		}
 		if media.SizeBytes != nil {
 			view.SizeBytes = *media.SizeBytes
+		}
+		if media.VideoCodec != nil {
+			view.VideoCodec = *media.VideoCodec
+		}
+		if media.AudioCodec != nil {
+			view.AudioCodec = *media.AudioCodec
 		}
 		mediaFiles = append(mediaFiles, view)
 	}

@@ -61,6 +61,13 @@ type ProjectMediaFileResponse struct {
 	MimeType         *string   `json:"mimeType"`
 	SizeBytes        int64     `json:"sizeBytes"`
 	DurationMs       int64     `json:"durationMs"`
+	Width            *int      `json:"width"`
+	Height           *int      `json:"height"`
+	FPS              *float64  `json:"fps"`
+	VideoCodec       *string   `json:"videoCodec"`
+	AudioCodec       *string   `json:"audioCodec"`
+	AudioSampleRate  *int      `json:"audioSampleRate"`
+	AudioChannels    *int      `json:"audioChannels"`
 	OriginalURL      *string   `json:"originalUrl"`
 	ThumbnailURL     *string   `json:"thumbnailUrl"`
 	Status           string    `json:"status"`
@@ -76,6 +83,13 @@ func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) Proj
 			MimeType:         optionalNonEmptyString(media.MimeType),
 			SizeBytes:        media.SizeBytes,
 			DurationMs:       media.DurationMs,
+			Width:            media.Width,
+			Height:           media.Height,
+			FPS:              media.FPS,
+			VideoCodec:       optionalNonEmptyString(media.VideoCodec),
+			AudioCodec:       optionalNonEmptyString(media.AudioCodec),
+			AudioSampleRate:  media.AudioSampleRate,
+			AudioChannels:    media.AudioChannels,
 			OriginalURL:      optionalNonEmptyString(media.OriginalURL),
 			ThumbnailURL:     optionalNonEmptyString(mediaFileThumbnailURL(media.ID.String(), media.ThumbnailKey)),
 			Status:           media.Status,
