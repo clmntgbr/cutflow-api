@@ -12,6 +12,7 @@ const (
 	ActionAudioReady       = "audio_ready"
 	ActionSilenceDetected  = "silence_detected"
 	ActionTranscriptReady  = "transcript_ready"
+	ActionTranscriptAnalysisReady = "transcript_analysis_ready"
 
 	EntityUser      = "user"
 	EntityMediaFile = "media_file"

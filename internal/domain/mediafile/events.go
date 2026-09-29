@@ -12,6 +12,7 @@ const (
 	EventTypeMediaFileProbeFailed         = "media_file.probe_failed.v1"
 	EventTypeMediaFileSilenceRequested    = "media_file.silence_requested.v1"
 	EventTypeMediaFileTranscriptRequested = "media_file.transcript_requested.v1"
+	EventTypeMediaFileAnalysisRequested   = "media_file.analysis_requested.v1"
 )
 
 type MediaFileCreated struct {
@@ -156,3 +157,20 @@ func (e MediaFileTranscriptRequested) EventID() string       { return e.ID }
 func (e MediaFileTranscriptRequested) EventType() string     { return EventTypeMediaFileTranscriptRequested }
 func (e MediaFileTranscriptRequested) AggregateID() string   { return e.MediaFileID }
 func (e MediaFileTranscriptRequested) OccurredAt() time.Time { return e.Timestamp }
+
+// MediaFileAnalysisRequested is emitted after transcription completes.
+// The analysis worker only needs TranscriptWord[]; it does not use audio/silence.
+type MediaFileAnalysisRequested struct {
+	ID           string    `json:"eventId"`
+	MediaFileID  string    `json:"mediaFileId"`
+	ProjectID    string    `json:"projectId"`
+	UserID       string    `json:"userId"`
+	JobID        string    `json:"jobId"`
+	TranscriptID string    `json:"transcriptId"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e MediaFileAnalysisRequested) EventID() string       { return e.ID }
+func (e MediaFileAnalysisRequested) EventType() string     { return EventTypeMediaFileAnalysisRequested }
+func (e MediaFileAnalysisRequested) AggregateID() string   { return e.MediaFileID }
+func (e MediaFileAnalysisRequested) OccurredAt() time.Time { return e.Timestamp }

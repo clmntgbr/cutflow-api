@@ -15,9 +15,10 @@ const (
 	StatusSuccess    = "success"
 	StatusFailed     = "failed"
 
-	NameExtractAudio     = "extract_audio"
-	NameDetectSilence    = "detect_silence"
-	NameTranscribeAudio  = "transcribe_audio"
+	NameExtractAudio      = "extract_audio"
+	NameDetectSilence     = "detect_silence"
+	NameTranscribeAudio   = "transcribe_audio"
+	NameAnalyzeTranscript = "analyze_transcript"
 )
 
 type Job struct {

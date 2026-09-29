@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"time"
 
 	"go-api/internal/application/messaging"
 	domainjob "go-api/internal/domain/job"
@@ -226,6 +227,29 @@ func (h *TranscribeAudioHandler) complete(
 				events = append(events, job.PullEvents()...)
 			}
 		}
+
+		// Text analysis runs right after transcription — TranscriptWord[] only,
+		// independent of silence / audio analysis.
+		analysisJob := domainjob.New(
+			transcript.ProjectID,
+			transcript.MediaFileID,
+			transcript.UserID,
+			domainjob.NameAnalyzeTranscript,
+		)
+		if err := h.jobRepo.Save(txCtx, analysisJob); err != nil {
+			return messaging.Retryable(err)
+		}
+		events = append(events, analysisJob.PullEvents()...)
+		events = append(events, domainmediafile.MediaFileAnalysisRequested{
+			ID:           uuid.New().String(),
+			MediaFileID:  transcript.MediaFileID.String(),
+			ProjectID:    transcript.ProjectID.String(),
+			UserID:       transcript.UserID.String(),
+			JobID:        analysisJob.ID.String(),
+			TranscriptID: transcript.ID.String(),
+			Timestamp:    time.Now().UTC(),
+		})
+
 		return h.outbox.StoreEvents(txCtx, events)
 	})
 }

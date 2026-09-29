@@ -149,6 +149,32 @@ services:
       - api
     restart: unless-stopped
 
+  analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: analysis
+    command: ["go", "run", "./cmd/analysis"]
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      ANALYSIS_QUEUE: ${ANALYSIS_QUEUE:-analysis}
+      ANALYSIS_ROUTING_KEY: ${ANALYSIS_ROUTING_KEY:-media_file.analysis_requested.v1}
+      ANALYSIS_CONCURRENCY: ${ANALYSIS_CONCURRENCY:-5}
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - api
+    restart: unless-stopped
+
   database:
     container_name: datastore
     image: postgres:${POSTGRES_VERSION:-16}-alpine

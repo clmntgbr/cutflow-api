@@ -12,6 +12,7 @@ import (
 	"go-api/internal/domain/port"
 	domainsilence "go-api/internal/domain/silence"
 	domaintranscript "go-api/internal/domain/transcript"
+	domaintranscriptissue "go-api/internal/domain/transcriptissue"
 )
 
 type PublishRealtimeHandler struct {
@@ -44,6 +45,9 @@ type mediaFileRealtimePayload struct {
 	Language        string    `json:"language,omitempty"`
 	SRTKey          string    `json:"srtKey,omitempty"`
 	ASSKey          string    `json:"assKey,omitempty"`
+	FillerCount     int       `json:"fillerCount,omitempty"`
+	RepetitionCount int       `json:"repetitionCount,omitempty"`
+	FalseStartCount int       `json:"falseStartCount,omitempty"`
 	Reason          string    `json:"reason,omitempty"`
 	OccurredAt      time.Time `json:"occurredAt"`
 }
@@ -200,5 +204,20 @@ func (h *PublishRealtimeHandler) OnTranscriptFailed(ctx context.Context, payload
 		Status:      evt.Status,
 		Reason:      evt.Reason,
 		OccurredAt:  evt.Timestamp,
+	})
+}
+
+func (h *PublishRealtimeHandler) OnTranscriptAnalysisReady(ctx context.Context, payload []byte) error {
+	var evt domaintranscriptissue.TranscriptAnalysisReady
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionTranscriptAnalysisReady, evt.UserID, mediaFileRealtimePayload{
+		MediaFileID:     evt.MediaFileID,
+		ProjectID:       evt.ProjectID,
+		FillerCount:     evt.FillerCount,
+		RepetitionCount: evt.RepetitionCount,
+		FalseStartCount: evt.FalseStartCount,
+		OccurredAt:      evt.Timestamp,
 	})
 }

@@ -18,6 +18,7 @@ func Models() []any {
 		&write.MediaFileModel{},
 		&write.MediaAudioModel{},
 		&write.DetectedSilenceModel{},
+		&write.DetectedTranscriptIssueModel{},
 		&write.TranscriptModel{},
 		&write.TranscriptWordModel{},
 		&write.JobModel{},

@@ -17,6 +17,7 @@ import (
 	domainproject "go-api/internal/domain/project"
 	domainsilence "go-api/internal/domain/silence"
 	domaintranscript "go-api/internal/domain/transcript"
+	domaintranscriptissue "go-api/internal/domain/transcriptissue"
 	domainuser "go-api/internal/domain/user"
 	"go-api/internal/infrastructure/centrifugo"
 	"go-api/internal/infrastructure/config"
@@ -183,6 +184,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo,
 		"publish_media_file_transcript_failed_realtime",
 		publishMediaRealtime.OnTranscriptFailed,
+	))
+	reg.Register(domaintranscriptissue.EventTypeTranscriptAnalysisReady, dedup.With(
+		dedupRepo,
+		"publish_media_file_transcript_analysis_ready_realtime",
+		publishMediaRealtime.OnTranscriptAnalysisReady,
 	))
 	reg.Register(domainproject.EventTypeProjectUpdated, dedup.With(
 		dedupRepo,

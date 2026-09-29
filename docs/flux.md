@@ -55,29 +55,31 @@
 │   (SOURCE TIME)             │    │ threshold Auto              │
 │ + confidence                │    │ DetectedSilence[] (brut)    │
 │                             │    │ SourceTime                  │
-│                             │    │                             │
-│ Stocke :                    │    │ noise_floor_db              │
-│ • transcript                │    │ calculated_threshold_db     │
-│ • transcript_word           │    │                             │
-│ • SRT source (toujours)     │    │ Filtres (min / paddings)    │
-│                             │    │ → plus tard EditDecision    │
-│ PAS d'ASS final ici         │    │                             │
+│ Stocke :                    │    │                             │
+│ • transcript                │    │ noise_floor_db              │
+│ • transcript_word           │    │ calculated_threshold_db     │
+│ • SRT source (toujours)     │    │                             │
+│                             │    │ Filtres (min / paddings)    │
+│ PAS d'ASS final ici         │    │ → plus tard EditDecision    │
 │ (après Timeline)            │    │                             │
-│ TranscriptWord[]            │    │                             │
 └──────────────┬──────────────┘    └──────────────┬──────────────┘
                │                                  │
+               │ après transcript only            │
+               │ (pas de dépendance silence)      │
                ▼                                  │
 ┌─────────────────────────────┐                   │
 │ 5. TEXT ANALYSIS            │                   │
 │                             │                   │
-│ TranscriptWord[]            │                   │
+│ TranscriptWord[] uniquement │                   │
+│ (ni vidéo ni audio)         │                   │
 │      │                      │                   │
 │      ├── Fillers            │                   │
 │      ├── Répétitions        │                   │
 │      └── Faux départs       │                   │
 │                             │                   │
-│ DetectedFiller[]            │                   │
-│ DetectedRepetition[]        │                   │
+│ DetectedTranscriptIssue[]   │                   │
+│ (filler / repetition /      │                   │
+│  false_start)               │                   │
 └──────────────┬──────────────┘                   │
                │                                  │
                ├─────────────────┐                │

@@ -652,7 +652,12 @@ EXTRACTION AUDIO (Opus)
 media_file.audio_ready
     ├── media_file.silence_requested  → worker silence (ffmpeg)
     └── media_file.transcript_requested → worker transcript (AssemblyAI → text + words SourceTime + SRT)
+            └── media_file.analysis_requested → worker analysis (TranscriptWord[] → fillers / répétitions / faux départs)
 ```
+
+Le worker `analysis` se lance **uniquement après** la transcription. Il ne
+dépend pas du silence / audio analysis : entrée = `TranscriptWord[]`
+seulement (pas de vidéo, pas d'audio).
 
 Les `CutSegment` (montage) et `ViralClip` restent distincts et viendront
 plus tard à partir du transcript global + des silences détectés.
@@ -723,9 +728,9 @@ SubtitleStyle
 subtitles.ass (OutputTime)
 ```
 
-Le transcript global sert ensuite à détecter fillers / répétitions,
-régénérer les sous-titres (plusieurs presets), et analyser les moments
-viraux.
+Le transcript global sert ensuite au worker `analysis` (fillers /
+répétitions / faux départs en SourceTime), puis à régénérer les
+sous-titres (plusieurs presets) et analyser les moments viraux.
 
 ### 14.4 Analyse virale globale
 

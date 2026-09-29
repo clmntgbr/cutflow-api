@@ -19,6 +19,7 @@ const (
 	KindSpeech     = "speech"
 	KindFiller     = "filler"
 	KindRepetition = "repetition"
+	KindFalseStart = "false_start"
 
 	SRTObjectName = "subtitles.srt"
 	ASSObjectName = "subtitles.ass"
