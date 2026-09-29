@@ -1,0 +1,177 @@
+{
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "responses": [
+    {
+      "clips": [
+        {
+          "start": "00:05.339",
+          "end": "00:21.052",
+          "content": "Aujourd'hui, je suis en Afrique du Sud à Cape Town et je m'apprête à tester l'un des trains les plus luxueux du monde. Le train qu'on va tester aujourd'hui s'appelle le Blue Train. Pour un montant de 5000 €, on va passer plus de 50 heures à bord de ce train avec tout un personnel à disposition."
+        },
+        {
+          "start": "01:40.745",
+          "end": "01:56.275",
+          "content": "Il y a carrément un majordome qui m'amène à ma chambre. Et je suis choqué de la chambre. Est-ce que vous rendez compte qu'à la base un train t'as juste un vieux siège tout pourri? Là regardez tout ce que j'ai."
+        },
+        {
+          "start": "02:51.770",
+          "end": "03:02.346",
+          "content": "Attendez, je suis en train d'appeler, je suis en train d'appeler quelqu'un. C'est quoi ça? My name is Xolile, I will your butler during this journée. Ok, j'ai même la carte de mon majordome, je suis mort."
+        },
+        {
+          "start": "04:18.630",
+          "end": "04:30.470",
+          "content": "Santé à ce voyage de 50 heures. Mais en attendant mon sandwich, on va lire les règles de ce train. Informations avant le départ: tarif tout compris à l'exception du caviar, du champagne français et des appels téléphoniques externes."
+        },
+        {
+          "start": "06:02.427",
+          "end": "06:12.936",
+          "content": "Le soir, pour aller dîner, il faut obligatoirement mettre un costume. J'ai un costume dans ma valise, les gars. Va peut-être falloir que je le passe au pressing parce qu'il a dû mal vivre le voyage."
+        },
+        {
+          "start": "07:19.556",
+          "end": "07:34.700",
+          "content": "C'est vraiment magnifique. En fait tout à l'arrière, la grande vitre, le fait de voir le rail et tout, tu vois quand même jamais ça dans un train. L'ambiance à l'intérieur est très chic, mais dehors tu trouves ça magnifique."
+        },
+        {
+          "start": "08:01.890",
+          "end": "08:11.981",
+          "content": "En entrée il y avait soit salade soit un autre truc. Je voulais pas de salade, j'ai une gueule à manger de la salade. Voilà. Et en plat principal il y avait soit bœuf soit saumon et j'ai pris le bœuf."
+        },
+        {
+          "start": "09:25.557",
+          "end": "09:34.998",
+          "content": "Pour le repas, j'ai eu le droit à un filet de bœuf avec son jus corsé, accompagné d'une pomme de terre et des petits légumes croquants. Ah, c'est trop bon les gars!"
+        }
+      ]
+    },
+    {
+      "clips": [
+        {
+          "start": "09:30.170",
+          "end": "09:45.336",
+          "content": "Longtemps, moi plus longtemps que les autres parce que c'est le GOAT. Pour le repas, j'ai eu le droit à un filet de bœuf avec son jus corsé, accompagné d'une pomme de terre et des petits légumes croquants. Ah, c'est trop bon les gars! Mais là je vais finir en 2 minutes. Super bizarre cette phrase, faut pas la sortir de son contexte. Je connais même pas ce légume que je suis en train de manger."
+        },
+        {
+          "start": "10:01.210",
+          "end": "10:12.124",
+          "content": "Et pour finir en beauté, un pudding au chocolat avec une glace vanille et des cacahuètes. Oh, la glace, elle est vraiment bonne. En fait, elle est toute crémeuse, les gars, on dirait une glace un peu italienne. Il y a de la crème anglaise avec le pudding. C'est littéralement un gâteau au chocolat. Ah, franchement, c'est excellent."
+        },
+        {
+          "start": "10:43.335",
+          "end": "10:54.292",
+          "content": "Les gars, j'étais en train de regarder un petit peu le planning de la journée de demain et en vrai demain matin il y a le petit-déj qui est servi de 7h à 10h et j'ai envie de demander le petit-déj dans la chambre. Ça y est les gars, je me suis habitué. Je commence à abuser des bonnes choses."
+        },
+        {
+          "start": "12:15.834",
+          "end": "12:30.430",
+          "content": "Bon, après c'est peut-être moi qui ai mal choisi parce que c'est pas très coloré. J'ai pris une omelette. Par contre, normalement l'omelette elle avait l'air vraiment bonne sur le papier, avec que des trucs bons à l'intérieur. Allez hop, on prend un max de protéines pour la prise de masse. L'omelette est vraiment bonne, les gars. Eh ben, petit-déj validé, les gars."
+        },
+        {
+          "start": "13:12.517",
+          "end": "13:22.586",
+          "content": "Les gars, en fait, j'ai l'impression que à partir du moment où tu poses ton cul dans le dining car, tu peux que bien manger. Il y a du rabat frais s'il vous plaît ou pas? Le menu végétarien est validé. Je vous jure que je suis à deux doigts de lécher l'assiette, mais ici il y a des codes à respecter."
+        },
+        {
+          "start": "14:01.770",
+          "end": "14:11.970",
+          "content": "Mais c'est carrément fruits rouges. Ah non, ah non, il y a un petit goût de café à la fin. En fait, il y a un coulis fruits rouges, mais la panna cotta est bien au cappuccino. Ça c'est trop bon, ça c'est typiquement le genre de dessert que j'adore. La texture elle est trop bonne, c'est bien frais."
+        },
+        {
+          "start": "15:02.353",
+          "end": "15:07.493",
+          "content": "Après plus de 24 heures dans ce train, nous reposons enfin un pied par terre. Ça fait quand même 24 heures que je suis dans ce train, les mecs. Ah ouais, on a un minivan! Et après une bonne heure à profiter du paysage et à écouter le guide, on arrive enfin au Big Hole."
+        },
+        {
+          "start": "16:00.160",
+          "end": "16:10.147",
+          "content": "Wow. After the passing of many moons. Je comprends rien à ce qui m'arrive les gars, je comprends rien à l'expédition. Moi je croyais que j'allais voir une mine de diamants, on est en train de me foutre devant un film anglais, je comprends rien."
+        },
+        {
+          "start": "17:03.787",
+          "end": "17:18.846",
+          "content": "Parce que oui, ce que vous voyez là, c'est pas naturel. Ça a été creusé par l'homme à l'explosif. Moi c'est ça que je voulais voir les gars. Et du coup ça a été creusé à 700 mètres en dessous, sauf que là ça a été recouvert par de l'eau entre-temps."
+        },
+        {
+          "start": "18:04.050",
+          "end": "18:09.086",
+          "content": "À la fin, on pouvait observer les différents diamants qui ont été excavés. Dites-vous, ça c'est vraiment les beaux gosses du diamant. Et regardez, à peine arrivé à la sortie, regardez ce qui nous attend. Big Hall Trading Store, The Jewel Box."
+        }
+      ]
+    },
+    {
+      "clips": [
+        {
+          "start": "19:11.151",
+          "end": "19:33.040",
+          "content": "Quel retour! J'adore! Quel accueil! Mais j'adore ce train en fait, les gars. C'était cool. En vrai, c'est pas mal d'avoir mis ça au milieu du trajet, ça fait vraiment un petit moment où tu coupes et ça fait plaisir de revenir dans le train. Et en fait, tu te rends compte que ce train est merveilleux."
+        },
+        {
+          "start": "20:10.869",
+          "end": "20:21.555",
+          "content": "Par contre les gars, plus les heures avancent dans ce train, plus les repas sont petits. C'est quoi ça? J'ai 2 morceaux de pommes avec une nugget, c'est, c'est abusé. Alors en vrai ça c'est vraiment de la pomme, par contre ça c'est du camembert rôti avec du fruit rouge."
+        },
+        {
+          "start": "20:43.053",
+          "end": "20:53.156",
+          "content": "Alors, le camembert pané est tellement bon, et le petit côté fruits rouges, au début j'ai cru que j'allais pas aimer, et en fait ça rajoute un petit côté sucré-salé, très très bon. Les gars, je retire tout ce que j'ai dit sur l'entrée. L'entrée est incroyable."
+        },
+        {
+          "start": "21:31.196",
+          "end": "21:46.948",
+          "content": "On me sert un plat d'agneau avec des légumes. J'ai pris de l'agneau de Karoo. En fait Karoo c'est une région d'Afrique du Sud donc c'est de l'agneau de cette région-là. Alors c'est très gras, mais qu'est-ce que c'est bon! Oh, ça fond dans la bouche."
+        },
+        {
+          "start": "22:02.503",
+          "end": "22:12.955",
+          "content": "Et en dessert, un sorbet citron avec cigare au chocolat. C'était vraiment le nom du dessert. C'est quand même la première fois que je vois un trompe-l'œil cigare, et en vrai il est plutôt bien fait. Allez, on va tester ça les gars."
+        },
+        {
+          "start": "25:12.547",
+          "end": "25:17.747",
+          "content": "Ah, je vais enjoy là. One, two, three. C'est quoi cette scène, frère? Ok, j'ai sorti le téléphone, les gars. J'ai rangé la caméra parce que j'étais en train de prendre des coups de pression parce que je filmais dans le bar."
+        },
+        {
+          "start": "26:01.602",
+          "end": "26:11.845",
+          "content": "Je n'ai jamais fait fumé de ma vie, je vous jure. Il a dit c'était le truc le plus smooth qu'ils avaient. J'ai envie de vomir, ça me fait une sensation là dans la gorge, je vous jure, ça me donne envie de BG."
+        },
+        {
+          "start": "27:04.156",
+          "end": "27:09.173",
+          "content": "Mais il y a vraiment un truc genre un peu fumé ou quoi. Attends, en fait c'est du café. J'ai dit du goût fumé, mais c'est du café à l'intérieur. Je regoûte et poker face."
+        },
+        {
+          "start": "28:02.080",
+          "end": "28:06.452",
+          "content": "Vous m'en voulez pas, j'en avais besoin. Bah allez, ça va prendre un bain et ça va aller se coucher."
+        },
+        {
+          "start": "28:11.882",
+          "end": "28:27.190",
+          "content": "Oh là là là là là là, en vrai je suis trop bien les gars, je me suis mis une petite bombe de bain. Oh, je suis au top! C'est littéralement le 3e jour que je passe dans ce train et au bout d'un moment, je vous cache pas qu'on commence à tourner un peu en rond."
+        }
+      ]
+    },
+    {
+      "clips": [
+        {
+          "start": "28:35.870",
+          "end": "29:32.770",
+          "description": "Mr. Miguel Macioli reçoit un certificat de voyage du Blue Train et un cadeau surprise, exprimant son enthousiasme et sa satisfaction."
+        },
+        {
+          "start": "30:05.229",
+          "end": "30:31.402",
+          "description": "Mr. Macioli quitte le train avec une pointe de déception, espérant une meilleure fin de voyage après une expérience luxueuse."
+        },
+        {
+          "start": "30:31.516",
+          "end": "31:02.388",
+          "description": "Il partage ses réflexions sur le voyage, la nostalgie du club car et le retour à la réalité après une expérience mémorable."
+        }
+      ]
+    }
+  ]
+}

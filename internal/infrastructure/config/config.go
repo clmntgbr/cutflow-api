@@ -70,7 +70,8 @@ type Config struct {
 	ViralLLMModel           string
 	ViralLLMAPIKey          string
 	ViralLLMBaseURL         string
-	ViralLLMDumpJSON        string
+	ViralUseFixtures        bool
+	ViralFixtureJSON        string
 	ViralChunkDurationMs    int64
 	ViralChunkOverlapMs     int64
 	TimelineQueue           string
@@ -143,7 +144,8 @@ func Load() *Config {
 		ViralLLMModel:           getEnvOrDefault("VIRAL_LLM_MODEL", "gpt-4o-mini"),
 		ViralLLMAPIKey:          getEnvOrDefault("VIRAL_LLM_API_KEY", ""),
 		ViralLLMBaseURL:         getEnvOrDefault("VIRAL_LLM_BASE_URL", ""),
-		ViralLLMDumpJSON:        getEnvOrDefault("VIRAL_LLM_DUMP_JSON", "fixtures/viral_llm.json"),
+		ViralUseFixtures:        getEnvBoolOrDefault("VIRAL_USE_FIXTURES", false),
+		ViralFixtureJSON:        getEnvOrDefault("VIRAL_FIXTURE_JSON", "fixtures/viral_llm.json"),
 		ViralChunkDurationMs:    getEnvInt64OrDefault("VIRAL_CHUNK_DURATION_MS", 600000),
 		ViralChunkOverlapMs:     getEnvInt64OrDefault("VIRAL_CHUNK_OVERLAP_MS", 30000),
 		TimelineQueue:           getEnvOrDefault("TIMELINE_QUEUE", "timeline"),
