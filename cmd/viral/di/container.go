@@ -48,8 +48,14 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		}
 	}
 
-	analyzer := viralllm.New(env.ViralLLMProvider, env.ViralLLMModel, apiKey, env.ViralLLMBaseURL)
-	log.Printf("viral llm provider=%s model=%s", analyzer.Provider(), analyzer.Model())
+	analyzer := viralllm.New(
+		env.ViralLLMProvider,
+		env.ViralLLMModel,
+		apiKey,
+		env.ViralLLMBaseURL,
+		env.ViralLLMDumpJSON,
+	)
+	log.Printf("viral llm provider=%s model=%s dump=%s", analyzer.Provider(), analyzer.Model(), env.ViralLLMDumpJSON)
 
 	outboxRepo := outbox.NewRepository(db)
 	dedupRepo := processed.NewRepository(db)

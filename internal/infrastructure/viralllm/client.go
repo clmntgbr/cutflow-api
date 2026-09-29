@@ -6,8 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"go-api/internal/domain/port"
@@ -30,15 +34,26 @@ Do not invent content that does not appear in the transcript.
 All timestamps must correspond to the provided transcript.
 Return only JSON matching the schema.`
 
+// FixtureDump stores exact LLM message contents for later replay.
+type FixtureDump struct {
+	Provider  string            `json:"provider"`
+	Model     string            `json:"model"`
+	Responses []json.RawMessage `json:"responses"`
+}
+
 type Client struct {
 	provider   string
 	model      string
 	apiKey     string
 	baseURL    string
+	dumpPath   string
 	httpClient *http.Client
+
+	mu    sync.Mutex
+	dumps []json.RawMessage
 }
 
-func New(provider, model, apiKey, baseURL string) *Client {
+func New(provider, model, apiKey, baseURL, dumpPath string) *Client {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	if baseURL == "" {
 		switch provider {
@@ -62,6 +77,7 @@ func New(provider, model, apiKey, baseURL string) *Client {
 		model:    model,
 		apiKey:   apiKey,
 		baseURL:  strings.TrimRight(baseURL, "/"),
+		dumpPath: strings.TrimSpace(dumpPath),
 		httpClient: &http.Client{
 			Timeout: 3 * time.Minute,
 		},
@@ -134,7 +150,58 @@ func (c *Client) Analyze(ctx context.Context, input port.ViralAnalyzeInput) ([]p
 	if len(envelope.Choices) == 0 {
 		return nil, fmt.Errorf("llm returned no choices")
 	}
-	return parseProposals(envelope.Choices[0].Message.Content)
+
+	content := envelope.Choices[0].Message.Content
+	if err := c.dumpResponse(content); err != nil {
+		log.Printf("viral llm fixture dump failed path=%s: %v", c.dumpPath, err)
+	}
+
+	return parseProposals(content)
+}
+
+func (c *Client) dumpResponse(content string) error {
+	if c.dumpPath == "" {
+		return nil
+	}
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return nil
+	}
+
+	raw := json.RawMessage(content)
+	if !json.Valid(raw) {
+		wrapped, err := json.Marshal(map[string]string{"raw": content})
+		if err != nil {
+			return err
+		}
+		raw = wrapped
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.dumps = append(c.dumps, raw)
+
+	dump := FixtureDump{
+		Provider:  c.provider,
+		Model:     c.model,
+		Responses: append([]json.RawMessage(nil), c.dumps...),
+	}
+	pretty, err := json.MarshalIndent(dump, "", "  ")
+	if err != nil {
+		return err
+	}
+	pretty = append(pretty, '\n')
+
+	if dir := filepath.Dir(c.dumpPath); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	if err := os.WriteFile(c.dumpPath, pretty, 0o644); err != nil {
+		return err
+	}
+	log.Printf("viral llm fixture dumped path=%s responses=%d", c.dumpPath, len(c.dumps))
+	return nil
 }
 
 type llmResponse struct {
@@ -142,16 +209,16 @@ type llmResponse struct {
 }
 
 type llmCandidate struct {
-	StartMs         any     `json:"start_ms"`
-	EndMs           any     `json:"end_ms"`
-	Score           float64 `json:"score"`
+	StartMs         any      `json:"start_ms"`
+	EndMs           any      `json:"end_ms"`
+	Score           float64  `json:"score"`
 	HookScore       *float64 `json:"hook_score"`
 	StandaloneScore *float64 `json:"standalone_score"`
 	PayoffScore     *float64 `json:"payoff_score"`
 	InterestScore   *float64 `json:"interest_score"`
-	Title           string  `json:"title"`
-	Hook            string  `json:"hook"`
-	Reason          string  `json:"reason"`
+	Title           string   `json:"title"`
+	Hook            string   `json:"hook"`
+	Reason          string   `json:"reason"`
 }
 
 func parseProposals(content string) ([]port.ViralLLMProposal, error) {
