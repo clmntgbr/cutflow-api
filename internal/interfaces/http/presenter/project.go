@@ -25,11 +25,12 @@ func NewRequestUploadURLResponse(result *cmdproject.RequestUploadURLResult) Requ
 
 // ProjectListItemResponse is intentionally lean for short list calls.
 type ProjectListItemResponse struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Status       string    `json:"status"`
-	CreatedAt    time.Time `json:"createdAt"`
-	ThumbnailURL *string   `json:"thumbnailUrl"`
+	ID           string               `json:"id"`
+	Name         string               `json:"name"`
+	Status       string               `json:"status"`
+	CreatedAt    time.Time            `json:"createdAt"`
+	ThumbnailURL *string              `json:"thumbnailUrl"`
+	Jobs         []ProjectJobResponse `json:"jobs"`
 }
 
 func NewProjectListResponseFromViews(views []domainproject.ProjectListView) []ProjectListItemResponse {
@@ -41,18 +42,20 @@ func NewProjectListResponseFromViews(views []domainproject.ProjectListView) []Pr
 			Status:       view.Status,
 			CreatedAt:    view.CreatedAt,
 			ThumbnailURL: optionalNonEmptyString(mediaFileThumbnailURL(view.MediaFileID.String(), view.ThumbnailKey)),
+			Jobs:         newProjectJobResponses(view.Jobs),
 		})
 	}
 	return out
 }
 
 type ProjectDetailResponse struct {
-	ID         string                        `json:"id"`
-	Name       string                        `json:"name"`
-	Status     string                        `json:"status"`
-	CreatedAt  time.Time                     `json:"createdAt"`
-	UpdatedAt  time.Time                     `json:"updatedAt"`
-	MediaFiles []ProjectMediaFileResponse    `json:"mediaFiles"`
+	ID         string                     `json:"id"`
+	Name       string                     `json:"name"`
+	Status     string                     `json:"status"`
+	CreatedAt  time.Time                  `json:"createdAt"`
+	UpdatedAt  time.Time                  `json:"updatedAt"`
+	MediaFiles []ProjectMediaFileResponse `json:"mediaFiles"`
+	Jobs       []ProjectJobResponse       `json:"jobs"`
 }
 
 type ProjectMediaFileResponse struct {
@@ -72,6 +75,18 @@ type ProjectMediaFileResponse struct {
 	ThumbnailURL     *string   `json:"thumbnailUrl"`
 	Status           string    `json:"status"`
 	CreatedAt        time.Time `json:"createdAt"`
+}
+
+type ProjectJobResponse struct {
+	ID           string     `json:"id"`
+	MediaFileID  string     `json:"mediaFileId"`
+	Name         string     `json:"name"`
+	Status       string     `json:"status"`
+	ErrorMessage *string    `json:"errorMessage"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
+	StartedAt    *time.Time `json:"startedAt"`
+	CompletedAt  *time.Time `json:"completedAt"`
 }
 
 func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) ProjectDetailResponse {
@@ -103,7 +118,26 @@ func NewProjectDetailResponseFromView(view domainproject.ProjectDetailView) Proj
 		CreatedAt:  view.CreatedAt,
 		UpdatedAt:  view.UpdatedAt,
 		MediaFiles: mediaFiles,
+		Jobs:       newProjectJobResponses(view.Jobs),
 	}
+}
+
+func newProjectJobResponses(jobs []domainproject.ProjectJobView) []ProjectJobResponse {
+	out := make([]ProjectJobResponse, 0, len(jobs))
+	for _, job := range jobs {
+		out = append(out, ProjectJobResponse{
+			ID:           job.ID.String(),
+			MediaFileID:  job.MediaFileID.String(),
+			Name:         job.Name,
+			Status:       job.Status,
+			ErrorMessage: optionalNonEmptyString(job.ErrorMessage),
+			CreatedAt:    job.CreatedAt,
+			UpdatedAt:    job.UpdatedAt,
+			StartedAt:    job.StartedAt,
+			CompletedAt:  job.CompletedAt,
+		})
+	}
+	return out
 }
 
 func mediaFileThumbnailURL(mediaFileID, thumbnailKey string) string {

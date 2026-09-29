@@ -29,6 +29,7 @@ type ProjectListView struct {
 	CreatedAt    time.Time
 	MediaFileID  uuid.UUID
 	ThumbnailKey string
+	Jobs         []ProjectJobView
 }
 
 type ProjectDetailView struct {
@@ -38,6 +39,7 @@ type ProjectDetailView struct {
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	MediaFiles []ProjectMediaFileView
+	Jobs       []ProjectJobView
 }
 
 type ProjectMediaFileView struct {
@@ -58,4 +60,16 @@ type ProjectMediaFileView struct {
 	ThumbnailKey     string
 	Status           string
 	CreatedAt        time.Time
+}
+
+type ProjectJobView struct {
+	ID           uuid.UUID
+	MediaFileID  uuid.UUID
+	Name         string
+	Status       string
+	ErrorMessage string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	StartedAt    *time.Time
+	CompletedAt  *time.Time
 }

@@ -55,6 +55,21 @@ type projectMediaFileRow struct {
 
 func (projectMediaFileRow) TableName() string { return "media_file" }
 
+type projectJobRow struct {
+	ID           uuid.UUID
+	ProjectID    uuid.UUID  `gorm:"column:project_id"`
+	MediaFileID  uuid.UUID  `gorm:"column:media_file_id"`
+	Name         string
+	Status       string
+	ErrorMessage *string    `gorm:"column:error_message"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	StartedAt    *time.Time
+	CompletedAt  *time.Time
+}
+
+func (projectJobRow) TableName() string { return "job" }
+
 var projectListSortColumns = map[string]string{
 	"created_at": "project.created_at",
 	"updated_at": "project.updated_at",
@@ -143,6 +158,32 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 		mediaFiles = append(mediaFiles, view)
 	}
 
+	var jobRows []projectJobRow
+	err = r.db.WithContext(ctx).
+		Select(
+			"id",
+			"project_id",
+			"media_file_id",
+			"name",
+			"status",
+			"error_message",
+			"created_at",
+			"updated_at",
+			"started_at",
+			"completed_at",
+		).
+		Where("project_id = ?", id).
+		Order("created_at ASC").
+		Find(&jobRows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	jobs := make([]domainproject.ProjectJobView, 0, len(jobRows))
+	for _, job := range jobRows {
+		jobs = append(jobs, projectJobViewFromRow(job))
+	}
+
 	return &domainproject.ProjectDetailView{
 		ID:         row.ID,
 		Name:       row.Name,
@@ -150,6 +191,7 @@ func (r *projectReadRepository) FindByID(ctx context.Context, id, userID uuid.UU
 		CreatedAt:  row.CreatedAt,
 		UpdatedAt:  row.UpdatedAt,
 		MediaFiles: mediaFiles,
+		Jobs:       jobs,
 	}, nil
 }
 
@@ -200,13 +242,78 @@ func (r *projectReadRepository) List(
 			Status:       row.Status,
 			CreatedAt:    row.CreatedAt,
 			ThumbnailKey: row.ThumbnailKey,
+			Jobs:         []domainproject.ProjectJobView{},
 		}
 		if row.MediaFileID != nil {
 			view.MediaFileID = *row.MediaFileID
 		}
 		views = append(views, view)
 	}
+
+	if err := r.attachJobs(ctx, views); err != nil {
+		return nil, 0, err
+	}
 	return views, total, nil
+}
+
+func (r *projectReadRepository) attachJobs(ctx context.Context, views []domainproject.ProjectListView) error {
+	if len(views) == 0 {
+		return nil
+	}
+
+	projectIDs := make([]uuid.UUID, len(views))
+	indexByID := make(map[uuid.UUID]int, len(views))
+	for i, view := range views {
+		projectIDs[i] = view.ID
+		indexByID[view.ID] = i
+	}
+
+	var jobRows []projectJobRow
+	err := r.db.WithContext(ctx).
+		Select(
+			"id",
+			"project_id",
+			"media_file_id",
+			"name",
+			"status",
+			"error_message",
+			"created_at",
+			"updated_at",
+			"started_at",
+			"completed_at",
+		).
+		Where("project_id IN ?", projectIDs).
+		Order("created_at ASC").
+		Find(&jobRows).Error
+	if err != nil {
+		return err
+	}
+
+	for _, job := range jobRows {
+		idx, ok := indexByID[job.ProjectID]
+		if !ok {
+			continue
+		}
+		views[idx].Jobs = append(views[idx].Jobs, projectJobViewFromRow(job))
+	}
+	return nil
+}
+
+func projectJobViewFromRow(job projectJobRow) domainproject.ProjectJobView {
+	view := domainproject.ProjectJobView{
+		ID:          job.ID,
+		MediaFileID: job.MediaFileID,
+		Name:        job.Name,
+		Status:      job.Status,
+		CreatedAt:   job.CreatedAt,
+		UpdatedAt:   job.UpdatedAt,
+		StartedAt:   job.StartedAt,
+		CompletedAt: job.CompletedAt,
+	}
+	if job.ErrorMessage != nil {
+		view.ErrorMessage = *job.ErrorMessage
+	}
+	return view
 }
 
 func normalizeProjectListSort(sortBy string) string {

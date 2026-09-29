@@ -98,6 +98,7 @@ func sampleUploadResult() *cmdproject.RequestUploadURLResult {
 }
 
 func sampleProjectListViews() []domainproject.ProjectListView {
+	startedAt := time.Date(2026, 9, 28, 10, 6, 0, 0, time.UTC)
 	return []domainproject.ProjectListView{
 		{
 			ID:           testutil.TestProjectID,
@@ -106,11 +107,23 @@ func sampleProjectListViews() []domainproject.ProjectListView {
 			CreatedAt:    time.Date(2026, 9, 28, 10, 0, 0, 0, time.UTC),
 			MediaFileID:  testutil.TestMediaFileID,
 			ThumbnailKey: "videos/" + testutil.TestMediaFileID.String() + "/thumbnail.jpg",
+			Jobs: []domainproject.ProjectJobView{
+				{
+					ID:          testutil.TestJobID,
+					MediaFileID: testutil.TestMediaFileID,
+					Name:        "extract_audio",
+					Status:      "processing",
+					CreatedAt:   time.Date(2026, 9, 28, 10, 5, 30, 0, time.UTC),
+					UpdatedAt:   startedAt,
+					StartedAt:   &startedAt,
+				},
+			},
 		},
 	}
 }
 
 func sampleProjectDetailView() *domainproject.ProjectDetailView {
+	startedAt := time.Date(2026, 9, 28, 10, 6, 0, 0, time.UTC)
 	return &domainproject.ProjectDetailView{
 		ID:        testutil.TestProjectID,
 		Name:      "Demo",
@@ -128,6 +141,17 @@ func sampleProjectDetailView() *domainproject.ProjectDetailView {
 				ThumbnailKey:     "videos/" + testutil.TestMediaFileID.String() + "/thumbnail.jpg",
 				Status:           "uploaded",
 				CreatedAt:        time.Date(2026, 9, 28, 10, 5, 0, 0, time.UTC),
+			},
+		},
+		Jobs: []domainproject.ProjectJobView{
+			{
+				ID:          testutil.TestJobID,
+				MediaFileID: testutil.TestMediaFileID,
+				Name:        "extract_audio",
+				Status:      "processing",
+				CreatedAt:   time.Date(2026, 9, 28, 10, 5, 30, 0, time.UTC),
+				UpdatedAt:   startedAt,
+				StartedAt:   &startedAt,
 			},
 		},
 	}

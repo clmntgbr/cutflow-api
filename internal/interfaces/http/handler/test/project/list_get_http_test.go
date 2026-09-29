@@ -74,6 +74,23 @@ func TestProjectHandler_List_Success(t *testing.T) {
 	if _, hasMediaFiles := item["mediaFiles"]; hasMediaFiles {
 		t.Fatal("list item must not include mediaFiles")
 	}
+	jobs, ok := item["jobs"].([]any)
+	if !ok || len(jobs) != 1 {
+		t.Fatalf("jobs: got %#v", item["jobs"])
+	}
+	job, ok := jobs[0].(map[string]any)
+	if !ok {
+		t.Fatalf("job item: got %#v", jobs[0])
+	}
+	if job["id"] != testutil.TestJobID.String() {
+		t.Fatalf("job id: got %v", job["id"])
+	}
+	if job["name"] != "extract_audio" {
+		t.Fatalf("job name: got %v", job["name"])
+	}
+	if job["status"] != "processing" {
+		t.Fatalf("job status: got %v", job["status"])
+	}
 }
 
 func TestProjectHandler_List_Unauthorized(t *testing.T) {
@@ -196,6 +213,21 @@ func TestProjectHandler_GetByID_Success(t *testing.T) {
 	wantThumb := "/api/media-files/" + testutil.TestMediaFileID.String() + "/thumbnail"
 	if out.MediaFiles[0].ThumbnailURL == nil || *out.MediaFiles[0].ThumbnailURL != wantThumb {
 		t.Fatalf("thumbnail url: got %v want %s", out.MediaFiles[0].ThumbnailURL, wantThumb)
+	}
+	if len(out.Jobs) != 1 {
+		t.Fatalf("jobs: got %d", len(out.Jobs))
+	}
+	if out.Jobs[0].ID != testutil.TestJobID.String() {
+		t.Fatalf("job id: got %s", out.Jobs[0].ID)
+	}
+	if out.Jobs[0].Name != "extract_audio" {
+		t.Fatalf("job name: got %s", out.Jobs[0].Name)
+	}
+	if out.Jobs[0].Status != "processing" {
+		t.Fatalf("job status: got %s", out.Jobs[0].Status)
+	}
+	if out.Jobs[0].MediaFileID != testutil.TestMediaFileID.String() {
+		t.Fatalf("job mediaFileId: got %s", out.Jobs[0].MediaFileID)
 	}
 }
 
