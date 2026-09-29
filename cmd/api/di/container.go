@@ -66,6 +66,7 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	requestUploadURLHandler := cmdproject.NewRequestUploadURLHandler(
 		projectWriteRepo,
 		mediaFileWriteRepo,
+		write.NewMediaConfigurationWriteRepository(db),
 		outboxRepo,
 		minioStorage,
 		env.UploadURLTTL,

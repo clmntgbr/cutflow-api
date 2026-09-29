@@ -46,12 +46,12 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	dedupRepo := processed.NewRepository(db)
 	detectHandler := cmdmediafile.NewDetectSilenceHandler(
 		write.NewDetectedSilenceWriteRepository(db),
+		write.NewMediaConfigurationWriteRepository(db),
 		write.NewJobWriteRepository(db),
 		minioStorage,
 		inframedia.NewSilenceDetector(),
+		inframedia.NewNoiseFloorAnalyzer(),
 		outboxRepo,
-		env.SilenceThresholdDB,
-		env.SilenceMinDurationMs,
 	)
 
 	reg := registry.NewHandlerRegistry()

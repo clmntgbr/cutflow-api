@@ -21,6 +21,7 @@ func Models() []any {
 		&write.TranscriptModel{},
 		&write.TranscriptWordModel{},
 		&write.JobModel{},
+		&write.MediaConfigurationModel{},
 		&outbox.OutboxEvent{},
 		&processed.ProcessedEvent{},
 	}

@@ -36,6 +36,11 @@ type SilenceDetector interface {
 	Detect(ctx context.Context, audioPath string, thresholdDB float64, minDurationMs int64) ([]SilenceInterval, error)
 }
 
+// NoiseFloorAnalyzer estimates background noise level in dBFS for auto silence threshold.
+type NoiseFloorAnalyzer interface {
+	Analyze(ctx context.Context, audioPath string) (float64, error)
+}
+
 type TranscriptWord struct {
 	Text      string
 	StartMs   int64

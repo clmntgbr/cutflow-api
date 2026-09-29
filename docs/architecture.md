@@ -662,6 +662,39 @@ L'audio est extrait **une seule fois** par média source (worker
 `extraction` sur `media_file.ready.v1`). Silence et transcription
 réutilisent la même clé MinIO.
 
+### 14.2bis Configuration média (non destructif)
+
+Dès la création du média, une `media_configuration` est créée avec les
+défauts produit (silence ON, seuil **auto**, niveau **aggressive**,
+padding 50/150 ms, min silence 500 ms, min parole 300 ms, fillers /
+répétitions / sous-titres / viral ON).
+
+Trois couches :
+
+``` text
+ANALYSIS (DetectedSilence, TranscriptWord, …)
+    +
+CONFIGURATION (media_configuration)
+    +
+USER OVERRIDES (edit_decision, plus tard)
+    ↓
+EDIT DECISIONS → TIMELINE → preview
+```
+
+Le worker silence lit la config :
+
+- `threshold_mode=auto` → `volumedetect` (noise floor) + offset selon
+  `silence_detection_level` → `calculated_silence_threshold_db` ;
+- `manual` → `silence_threshold_db` ;
+- `silence_min_duration_ms` pour ffmpeg `silencedetect`.
+
+Les paddings et `speech_min_duration_ms` s'appliquent plus tard au
+recalcul `EditDecision` / Timeline (pas à la détection brute).
+
+Changer un filtre (min silence, paddings…) ne relance pas AssemblyAI :
+on recalcule les décisions. Changer le seuil dB / l'agressivité peut
+relancer uniquement `SilenceDetection`.
+
 ### 14.3 Transcript global (full-file)
 
 Pas de `TranscriptSegment` / merge d'overlap : un seul job AssemblyAI

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go-api/internal/domain/event"
+	domainmediaconfig "go-api/internal/domain/mediaconfig"
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
 	domainproject "go-api/internal/domain/project"
@@ -32,6 +33,7 @@ type RequestUploadURLResult struct {
 type RequestUploadURLHandler struct {
 	projectRepo domainproject.ProjectWriteRepository
 	mediaRepo   domainmediafile.MediaFileWriteRepository
+	configRepo  domainmediaconfig.MediaConfigurationWriteRepository
 	outbox      port.OutboxRepository
 	storage     port.Storage
 	ttl         time.Duration
@@ -41,6 +43,7 @@ type RequestUploadURLHandler struct {
 func NewRequestUploadURLHandler(
 	projectRepo domainproject.ProjectWriteRepository,
 	mediaRepo domainmediafile.MediaFileWriteRepository,
+	configRepo domainmediaconfig.MediaConfigurationWriteRepository,
 	outbox port.OutboxRepository,
 	storage port.Storage,
 	ttl time.Duration,
@@ -52,6 +55,7 @@ func NewRequestUploadURLHandler(
 	return &RequestUploadURLHandler{
 		projectRepo: projectRepo,
 		mediaRepo:   mediaRepo,
+		configRepo:  configRepo,
 		outbox:      outbox,
 		storage:     storage,
 		ttl:         ttl,
@@ -90,6 +94,10 @@ func (h *RequestUploadURLHandler) Handle(ctx context.Context, cmd RequestUploadU
 			return err
 		}
 		if err := h.mediaRepo.Save(txCtx, media); err != nil {
+			return err
+		}
+		cfg := domainmediaconfig.NewDefault(media.ID)
+		if err := h.configRepo.Save(txCtx, cfg); err != nil {
 			return err
 		}
 		events := append([]event.DomainEvent{}, project.PullEvents()...)
