@@ -138,6 +138,8 @@ services:
       TRANSCRIPT_ROUTING_KEY: ${TRANSCRIPT_ROUTING_KEY:-media_file.transcript_requested.v1}
       TRANSCRIPT_CONCURRENCY: ${TRANSCRIPT_CONCURRENCY:-5}
       ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY:-}
+      TRANSCRIPT_USE_FIXTURES: ${TRANSCRIPT_USE_FIXTURES:-true}
+      TRANSCRIPT_FIXTURE_JSON: ${TRANSCRIPT_FIXTURE_JSON:-fixtures/transcript.json}
     depends_on:
       database:
         condition: service_healthy

@@ -58,6 +58,8 @@ type Config struct {
 	TranscriptRoutingKey    string
 	TranscriptConcurrency   int
 	AssemblyAIAPIKey        string
+	TranscriptUseFixtures   bool
+	TranscriptFixtureJSON   string
 }
 
 func Load() *Config {
@@ -113,6 +115,8 @@ func Load() *Config {
 		TranscriptRoutingKey:    getEnvOrDefault("TRANSCRIPT_ROUTING_KEY", "media_file.transcript_requested.v1"),
 		TranscriptConcurrency:   getEnvIntOrDefault("TRANSCRIPT_CONCURRENCY", 5),
 		AssemblyAIAPIKey:        getEnvOrDefault("ASSEMBLYAI_API_KEY", ""),
+		TranscriptUseFixtures:   getEnvBoolOrDefault("TRANSCRIPT_USE_FIXTURES", false),
+		TranscriptFixtureJSON:   getEnvOrDefault("TRANSCRIPT_FIXTURE_JSON", "fixtures/transcript.json"),
 	}
 }
 

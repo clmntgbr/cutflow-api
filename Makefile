@@ -75,5 +75,18 @@ purge: cli-build
 purge-storage: cli-build
 	@$(COMPOSE_DEV) exec api ./bin/cli purge-storage --yes
 
+build-transcript-fixture: cli-build
+	@$(COMPOSE_DEV) exec api ./bin/cli build-transcript-fixture \
+		--srt=subtitles.srt \
+		--ass=subtitles.ass \
+		--out=fixtures/transcript.json \
+		--language=fr
+
+export-transcript: cli-build
+	@test -n "$(MEDIA_FILE_ID)" || (echo "MEDIA_FILE_ID required"; exit 1)
+	@$(COMPOSE_DEV) exec api ./bin/cli export-transcript \
+		--media-file-id=$(MEDIA_FILE_ID) \
+		--out=fixtures/transcript.json
+
 shell:
 	$(COMPOSE_DEV) exec api sh

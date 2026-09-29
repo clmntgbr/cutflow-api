@@ -53,7 +53,9 @@ type TranscriptResult struct {
 	Language      string
 	Text          string
 	SRT           string
-	Words         []TranscriptWord
+	// ASS, when non-empty, is uploaded as-is (fixture / pre-rendered). Otherwise the handler generates it.
+	ASS   string
+	Words []TranscriptWord
 }
 
 type SpeechTranscriber interface {

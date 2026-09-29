@@ -67,6 +67,32 @@ func (r *transcriptWriteRepository) ReplaceWords(
 	return db.Create(&models).Error
 }
 
+func (r *transcriptWriteRepository) ListWords(
+	ctx context.Context,
+	transcriptID uuid.UUID,
+) ([]domaintranscript.Word, error) {
+	var models []TranscriptWordModel
+	err := DBWithContext(ctx, r.db).
+		Where("transcript_id = ?", transcriptID).
+		Order("word_index ASC").
+		Find(&models).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domaintranscript.Word, 0, len(models))
+	for _, m := range models {
+		out = append(out, domaintranscript.Word{
+			WordIndex:     m.WordIndex,
+			Text:          m.Text,
+			SourceStartMs: m.SourceStartMs,
+			SourceEndMs:   m.SourceEndMs,
+			Confidence:    m.Confidence,
+			Kind:          m.Kind,
+		})
+	}
+	return out, nil
+}
+
 func (r *transcriptWriteRepository) GetByMediaFileID(
 	ctx context.Context,
 	mediaFileID uuid.UUID,

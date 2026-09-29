@@ -135,5 +135,6 @@ type TranscriptWriteRepository interface {
 	Save(ctx context.Context, transcript *Transcript) error
 	Update(ctx context.Context, transcript *Transcript) error
 	ReplaceWords(ctx context.Context, transcriptID uuid.UUID, words []Word) error
+	ListWords(ctx context.Context, transcriptID uuid.UUID) ([]Word, error)
 	GetByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) (*Transcript, error)
 }

@@ -19,6 +19,8 @@ func main() {
 		cliCommand.NewMigrateCommand(),
 		cliCommand.NewPurgeCommand(),
 		cliCommand.NewPurgeStorageCommand(),
+		cliCommand.NewExportTranscriptCommand(),
+		cliCommand.NewBuildTranscriptFixtureCommand(),
 	)
 
 	if err := rootCmd.Execute(); err != nil {

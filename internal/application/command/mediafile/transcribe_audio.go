@@ -31,6 +31,7 @@ type TranscribeAudioHandler struct {
 	storage        port.Storage
 	transcriber    port.SpeechTranscriber
 	outbox         port.OutboxRepository
+	useFixtures    bool
 }
 
 func NewTranscribeAudioHandler(
@@ -39,6 +40,7 @@ func NewTranscribeAudioHandler(
 	storage port.Storage,
 	transcriber port.SpeechTranscriber,
 	outbox port.OutboxRepository,
+	useFixtures bool,
 ) *TranscribeAudioHandler {
 	return &TranscribeAudioHandler{
 		transcriptRepo: transcriptRepo,
@@ -46,6 +48,7 @@ func NewTranscribeAudioHandler(
 		storage:        storage,
 		transcriber:    transcriber,
 		outbox:         outbox,
+		useFixtures:    useFixtures,
 	}
 }
 
@@ -70,27 +73,33 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 		}
 	}
 
-	tmp, err := os.CreateTemp("", "media-transcript-*.opus")
-	if err != nil {
-		return messaging.Retryable(err)
-	}
-	defer os.Remove(tmp.Name())
-	defer tmp.Close()
+	var result port.TranscriptResult
+	if h.useFixtures {
+		log.Printf("transcript using local fixtures mediaFileId=%s", cmd.MediaFileID)
+		result, err = h.transcriber.Transcribe(ctx, "")
+	} else {
+		tmp, createErr := os.CreateTemp("", "media-transcript-*.opus")
+		if createErr != nil {
+			return messaging.Retryable(createErr)
+		}
+		defer os.Remove(tmp.Name())
+		defer tmp.Close()
 
-	reader, err := h.storage.Get(ctx, cmd.AudioKey)
-	if err != nil {
-		return messaging.Retryable(err)
-	}
-	if _, err := io.Copy(tmp, reader); err != nil {
+		reader, getErr := h.storage.Get(ctx, cmd.AudioKey)
+		if getErr != nil {
+			return messaging.Retryable(getErr)
+		}
+		if _, copyErr := io.Copy(tmp, reader); copyErr != nil {
+			_ = reader.Close()
+			return messaging.Retryable(copyErr)
+		}
 		_ = reader.Close()
-		return messaging.Retryable(err)
-	}
-	_ = reader.Close()
-	if err := tmp.Close(); err != nil {
-		return messaging.Retryable(err)
-	}
+		if closeErr := tmp.Close(); closeErr != nil {
+			return messaging.Retryable(closeErr)
+		}
 
-	result, err := h.transcriber.Transcribe(ctx, tmp.Name())
+		result, err = h.transcriber.Transcribe(ctx, tmp.Name())
+	}
 	if err != nil {
 		log.Printf("transcription failed mediaFileId=%s: %v", cmd.MediaFileID, err)
 		if failErr := h.fail(ctx, cmd.MediaFileID, cmd.JobID, "transcription failed"); failErr != nil {
@@ -117,9 +126,11 @@ func (h *TranscribeAudioHandler) Handle(ctx context.Context, cmd TranscribeAudio
 		})
 	}
 
-	// ASS is generated from words + style (not from AssemblyAI SRT).
-	// Source timestamps for now; remapping onto the final timeline happens at render.
-	ass := subtitle.GenerateASS(subtitleWords, subtitle.TikTokClassic())
+	ass := result.ASS
+	if ass == "" {
+		// Production path: generate animated ASS from words + style.
+		ass = subtitle.GenerateASS(subtitleWords, subtitle.TikTokClassic())
+	}
 
 	if err := h.storage.Put(ctx, transcript.SRTStorageKey, bytes.NewReader([]byte(result.SRT)), int64(len(result.SRT)), "application/x-subrip"); err != nil {
 		return messaging.Retryable(err)
