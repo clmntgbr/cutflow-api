@@ -8,6 +8,7 @@ import (
 	cmdmediafile "go-api/internal/application/command/mediafile"
 	"go-api/internal/application/messaging"
 	domainmediafile "go-api/internal/domain/mediafile"
+	domaintimeline "go-api/internal/domain/timeline"
 
 	"github.com/google/uuid"
 )
@@ -199,6 +200,49 @@ func (h *AnalyzeViralOnRequestedHandler) Handle(ctx context.Context, payload []b
 		ProjectID:    projectID,
 		UserID:       userID,
 		JobID:        jobID,
+	})
+}
+
+type RebuildTimelineOnRequestedHandler struct {
+	rebuild *cmdmediafile.RebuildTimelineHandler
+}
+
+func NewRebuildTimelineOnRequestedHandler(rebuild *cmdmediafile.RebuildTimelineHandler) *RebuildTimelineOnRequestedHandler {
+	return &RebuildTimelineOnRequestedHandler{rebuild: rebuild}
+}
+
+func (h *RebuildTimelineOnRequestedHandler) Handle(ctx context.Context, payload []byte) error {
+	var evt domaintimeline.RebuildRequested
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	mediaFileID, err := uuid.Parse(evt.MediaFileID)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	projectID, err := uuid.Parse(evt.ProjectID)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	userID, err := uuid.Parse(evt.UserID)
+	if err != nil {
+		return messaging.NonRetryable(err)
+	}
+	jobID := uuid.Nil
+	if evt.JobID != "" {
+		jobID, err = uuid.Parse(evt.JobID)
+		if err != nil {
+			return messaging.NonRetryable(err)
+		}
+	}
+
+	log.Printf("timeline worker received mediaFileId=%s jobId=%s reason=%s", evt.MediaFileID, evt.JobID, evt.Reason)
+	return h.rebuild.Handle(ctx, cmdmediafile.RebuildTimelineCommand{
+		MediaFileID: mediaFileID,
+		ProjectID:   projectID,
+		UserID:      userID,
+		JobID:       jobID,
+		Reason:      evt.Reason,
 	})
 }
 

@@ -13,6 +13,7 @@ import (
 	"go-api/internal/domain/port"
 	domaintranscript "go-api/internal/domain/transcript"
 	domaintranscriptissue "go-api/internal/domain/transcriptissue"
+	domaintimeline "go-api/internal/domain/timeline"
 
 	"github.com/google/uuid"
 )
@@ -180,6 +181,22 @@ func (h *AnalyzeTranscriptHandler) persist(
 				events = append(events, job.PullEvents()...)
 			}
 		}
+
+		timelineJob := domainjob.New(cmd.ProjectID, cmd.MediaFileID, cmd.UserID, domainjob.NameRebuildTimeline)
+		if err := h.jobRepo.Save(txCtx, timelineJob); err != nil {
+			return messaging.Retryable(err)
+		}
+		events = append(events, timelineJob.PullEvents()...)
+		events = append(events, domaintimeline.RebuildRequested{
+			ID:          uuid.New().String(),
+			MediaFileID: cmd.MediaFileID.String(),
+			ProjectID:   cmd.ProjectID.String(),
+			UserID:      cmd.UserID.String(),
+			JobID:       timelineJob.ID.String(),
+			Reason:      "transcript_analysis_ready",
+			Timestamp:   time.Now().UTC(),
+		})
+
 		return h.outbox.StoreEvents(txCtx, events)
 	})
 }

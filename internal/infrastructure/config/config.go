@@ -72,6 +72,9 @@ type Config struct {
 	ViralLLMBaseURL         string
 	ViralChunkDurationMs    int64
 	ViralChunkOverlapMs     int64
+	TimelineQueue           string
+	TimelineRoutingKey      string
+	TimelineConcurrency     int
 }
 
 func Load() *Config {
@@ -141,6 +144,9 @@ func Load() *Config {
 		ViralLLMBaseURL:         getEnvOrDefault("VIRAL_LLM_BASE_URL", ""),
 		ViralChunkDurationMs:    getEnvInt64OrDefault("VIRAL_CHUNK_DURATION_MS", 600000),
 		ViralChunkOverlapMs:     getEnvInt64OrDefault("VIRAL_CHUNK_OVERLAP_MS", 30000),
+		TimelineQueue:           getEnvOrDefault("TIMELINE_QUEUE", "timeline"),
+		TimelineRoutingKey:      getEnvOrDefault("TIMELINE_ROUTING_KEY", "media_file.timeline_rebuild_requested.v1"),
+		TimelineConcurrency:     getEnvIntOrDefault("TIMELINE_CONCURRENCY", 5),
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	domainsilence "go-api/internal/domain/silence"
 	domaintranscript "go-api/internal/domain/transcript"
 	domaintranscriptissue "go-api/internal/domain/transcriptissue"
+	domaintimeline "go-api/internal/domain/timeline"
 	domainviral "go-api/internal/domain/viral"
 )
 
@@ -50,6 +51,8 @@ type mediaFileRealtimePayload struct {
 	RepetitionCount int       `json:"repetitionCount,omitempty"`
 	FalseStartCount int       `json:"falseStartCount,omitempty"`
 	CandidateCount  int       `json:"candidateCount,omitempty"`
+	TimelineID      string    `json:"timelineId,omitempty"`
+	Version         int       `json:"version,omitempty"`
 	Reason          string    `json:"reason,omitempty"`
 	OccurredAt      time.Time `json:"occurredAt"`
 }
@@ -234,5 +237,20 @@ func (h *PublishRealtimeHandler) OnViralReady(ctx context.Context, payload []byt
 		ProjectID:      evt.ProjectID,
 		CandidateCount: evt.CandidateCount,
 		OccurredAt:     evt.Timestamp,
+	})
+}
+
+func (h *PublishRealtimeHandler) OnTimelineUpdated(ctx context.Context, payload []byte) error {
+	var evt domaintimeline.Updated
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionTimelineUpdated, evt.UserID, mediaFileRealtimePayload{
+		MediaFileID:  evt.MediaFileID,
+		ProjectID:    evt.ProjectID,
+		TimelineID:   evt.TimelineID,
+		Version:      evt.Version,
+		DurationMs:   evt.DurationMs,
+		OccurredAt:   evt.Timestamp,
 	})
 }

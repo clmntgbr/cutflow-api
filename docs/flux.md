@@ -12,81 +12,50 @@
 ┌──────────────────────────────────────────────┐
 │ 2. MEDIA PROBE                               │
 │                                              │
-│ FFprobe                                      │
-│                                              │
-│ Récupération :                               │
-│ • durée                                      │
-│ • résolution                                 │
-│ • framerate                                  │
-│ • codec vidéo                                │
-│ • codec audio                                │
-│ • bitrate                                    │
-│ • présence d'une piste audio                 │
-│ • taille                                     │
-│                                              │
-│ + validation du fichier                      │
+│ FFprobe → duration, codecs, …                │
 └──────────────────────┬───────────────────────┘
                        ▼
 ┌──────────────────────────────────────────────┐
 │ 3. EXTRACTION AUDIO                          │
 │                                              │
-│ FFmpeg                                       │
-│                                              │
-│ original.mp4                                 │
-│      ↓                                       │
-│ audio.opus                                   │
-│                                              │
-│ ~32-40 kbps / mono / 16 kHz                  │
-│                                              │
-│ Ex : ~1.4 Mo pour 5 minutes                  │
+│ original.mp4 → audio.opus                    │
 └──────────────────────┬───────────────────────┘
                        │
               ┌────────┴────────┐
               ▼                 ▼
 ┌─────────────────────────────┐    ┌─────────────────────────────┐
 │ 4A. TRANSCRIPTION           │    │ 4B. AUDIO ANALYSIS          │
-│                             │    │                             │
-│ AssemblyAI                  │    │ Analyse du bruit            │
-│                             │    │ + détection des silences    │
-│ audio.opus                  │    │                             │
-│      ↓                      │    │ audio.opus                  │
-│ transcript                  │    │      ↓                      │
-│ + timestamps par mot        │    │ noise floor                │
-│   (SOURCE TIME)             │    │ threshold Auto              │
-│ + confidence                │    │ DetectedSilence[] (brut)    │
-│                             │    │ SourceTime                  │
-│ Stocke :                    │    │                             │
-│ • transcript                │    │ noise_floor_db              │
-│ • transcript_word           │    │ calculated_threshold_db     │
-│ • SRT source (toujours)     │    │                             │
-│                             │    │ Filtres (min / paddings)    │
-│ PAS d'ASS final ici         │    │ → plus tard EditDecision    │
-│ (après Timeline)            │    │                             │
+│ AssemblyAI                  │    │ DetectedSilence[] (brut)    │
+│ TranscriptWord[] + SRT      │    │ + noise floor / threshold   │
 └──────────────┬──────────────┘    └──────────────┬──────────────┘
                │                                  │
                │ transcript.completed             │
-               │ (indépendant du silence)         │
       ┌────────┴────────┐                         │
       ▼                 ▼                         │
 ┌───────────────┐  ┌────────────────┐             │
 │ 5A. TEXT      │  │ 5B. VIRAL      │             │
 │ ANALYSIS      │  │ ANALYSIS       │             │
-│               │  │                │             │
-│ TranscriptWord│  │ TranscriptWord │             │
-│      │        │  │      ↓         │             │
-│ fillers       │  │ Formatter      │             │
-│ répétitions   │  │ Chunker        │             │
-│ faux départs  │  │ GPT/DeepSeek   │             │
-│               │  │ Boundary       │             │
-│ DetectedIssue │  │ Dedup / Rank   │             │
-│               │  │                │             │
-│               │  │ ViralCandidate │             │
-│               │  │ (SOURCE TIME)  │             │
-└───────┬───────┘  └───────┬────────┘             │
-        │                  │                      │
-        └────────┬─────────┘                      │
-                 │                                │
-                 ▼                                │
+│ fillers /     │  │ ViralCandidate │             │
+│ répétitions / │  │ (SOURCE TIME)  │             │
+│ faux départs  │  │ (non bloquant) │             │
+└───────┬───────┘  └────────────────┘             │
+        │                                         │
+        └─────────────────┬───────────────────────┘
+                          ▼
 ┌──────────────────────────────────────────────┐
-│ Analyses prêtes (silence ∥ text ∥ viral)     │
+│ 6. TIMELINE WORKER                           │
+│                                              │
+│ DetectedSilence[]                            │
+│ DetectedTranscriptIssue[]                    │
+│ MediaConfiguration                           │
+│ UserOverride[]                               │
+│       ↓                                      │
+│ EditDecision[]                               │
+│       ↓                                      │
+│ Timeline + TimelineSegment[]                 │
+│ (SOURCE ↔ OUTPUT)                            │
+│       ↓                                      │
+│ timeline.updated                             │
+│       ↓                                      │
+│ READY_TO_EDIT / Preview                      │
 └──────────────────────────────────────────────┘

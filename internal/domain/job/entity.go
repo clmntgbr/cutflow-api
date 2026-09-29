@@ -20,6 +20,7 @@ const (
 	NameTranscribeAudio   = "transcribe_audio"
 	NameAnalyzeTranscript = "analyze_transcript"
 	NameAnalyzeViral      = "analyze_viral"
+	NameRebuildTimeline   = "rebuild_timeline"
 )
 
 type Job struct {

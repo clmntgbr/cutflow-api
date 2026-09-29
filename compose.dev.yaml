@@ -207,6 +207,32 @@ services:
       - api
     restart: unless-stopped
 
+  timeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: timeline
+    command: ["go", "run", "./cmd/timeline"]
+    volumes:
+      - .:/app
+      - go-modules:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    env_file:
+      - .env
+    environment:
+      TIMELINE_QUEUE: ${TIMELINE_QUEUE:-timeline}
+      TIMELINE_ROUTING_KEY: ${TIMELINE_ROUTING_KEY:-media_file.timeline_rebuild_requested.v1}
+      TIMELINE_CONCURRENCY: ${TIMELINE_CONCURRENCY:-5}
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - api
+    restart: unless-stopped
+
   database:
     container_name: datastore
     image: postgres:${POSTGRES_VERSION:-16}-alpine

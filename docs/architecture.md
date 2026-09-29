@@ -759,6 +759,25 @@ ViralCandidate[] (SOURCE TIME)
 `ViralClip` (OUTPUT TIME) vient plus tard : `ViralCandidate + Timeline`.
 Le viral-worker ne touche jamais à la vidéo.
 
+### 14.4bis Timeline worker
+
+Le `timeline-worker` reconstruit le montage non destructif à partir des
+analyses déjà calculées (silence + text issues + config + overrides) :
+
+``` text
+DetectedSilence[] + DetectedTranscriptIssue[]
+        + MediaConfiguration + UserOverride[]
+        ↓
+EditDecision[] (REMOVE effectifs)
+        ↓
+TimelineSegment[] KEEP
+        ↓
+timeline.updated (SOURCE ↔ OUTPUT)
+```
+
+Déclenché par `timeline.rebuild.requested` après silence et/ou text
+analysis. Idempotent via fingerprint. Viral ne bloque pas. Aucun FFmpeg.
+
 ### 14.5 Timeline comme source de vérité
 
 La `Timeline` est la représentation centrale du montage.

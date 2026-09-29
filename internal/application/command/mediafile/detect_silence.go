@@ -14,6 +14,7 @@ import (
 	domainmediaconfig "go-api/internal/domain/mediaconfig"
 	"go-api/internal/domain/port"
 	domainsilence "go-api/internal/domain/silence"
+	domaintimeline "go-api/internal/domain/timeline"
 
 	"github.com/google/uuid"
 )
@@ -209,6 +210,22 @@ func (h *DetectSilenceHandler) persistResults(
 				events = append(events, job.PullEvents()...)
 			}
 		}
+
+		timelineJob := domainjob.New(cmd.ProjectID, cmd.MediaFileID, cmd.UserID, domainjob.NameRebuildTimeline)
+		if err := h.jobRepo.Save(txCtx, timelineJob); err != nil {
+			return messaging.Retryable(err)
+		}
+		events = append(events, timelineJob.PullEvents()...)
+		events = append(events, domaintimeline.RebuildRequested{
+			ID:          uuid.New().String(),
+			MediaFileID: cmd.MediaFileID.String(),
+			ProjectID:   cmd.ProjectID.String(),
+			UserID:      cmd.UserID.String(),
+			JobID:       timelineJob.ID.String(),
+			Reason:      "silence_detected",
+			Timestamp:   time.Now().UTC(),
+		})
+
 		return h.outbox.StoreEvents(txCtx, events)
 	})
 }

@@ -14,6 +14,7 @@ const (
 	ActionTranscriptReady  = "transcript_ready"
 	ActionTranscriptAnalysisReady = "transcript_analysis_ready"
 	ActionViralReady              = "viral_ready"
+	ActionTimelineUpdated         = "timeline_updated"
 
 	EntityUser      = "user"
 	EntityMediaFile = "media_file"

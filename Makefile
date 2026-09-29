@@ -8,7 +8,7 @@ dev:
 	$(COMPOSE_DEV) up -d
 
 restart:
-	$(COMPOSE_DEV) restart worker api extraction silence transcript analysis viral
+	$(COMPOSE_DEV) restart worker api extraction silence transcript analysis viral timeline
 
 build:
 	$(COMPOSE_DEV) up -d --build
@@ -17,7 +17,7 @@ dev-down:
 	$(COMPOSE_DEV) down
 
 dev-logs:
-	$(COMPOSE_DEV) logs -f api worker extraction silence transcript analysis viral
+	$(COMPOSE_DEV) logs -f api worker extraction silence transcript analysis viral timeline
 
 api-logs:
 	$(COMPOSE_DEV) logs -f api
@@ -29,7 +29,7 @@ extraction-logs:
 	$(COMPOSE_DEV) logs -f extraction
 
 dev-restart:
-	$(COMPOSE_DEV) restart api worker extraction silence transcript analysis viral
+	$(COMPOSE_DEV) restart api worker extraction silence transcript analysis viral timeline
 
 lint:
 	$(COMPOSE_DEV) exec api golangci-lint run --fix

@@ -50,3 +50,30 @@ func (r *detectedTranscriptIssueWriteRepository) CountByMediaFileID(ctx context.
 		Count(&total).Error
 	return total, err
 }
+
+func (r *detectedTranscriptIssueWriteRepository) ListByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) ([]*domaintranscriptissue.Issue, error) {
+	var models []DetectedTranscriptIssueModel
+	if err := DBWithContext(ctx, r.db).
+		Where("media_file_id = ?", mediaFileID).
+		Order("source_start_ms ASC").
+		Find(&models).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domaintranscriptissue.Issue, 0, len(models))
+	for _, m := range models {
+		out = append(out, &domaintranscriptissue.Issue{
+			ID:             m.ID,
+			MediaFileID:    m.MediaFileID,
+			TranscriptID:   m.TranscriptID,
+			Type:           m.IssueType,
+			Text:           m.Text,
+			SourceStartMs:  m.SourceStartMs,
+			SourceEndMs:    m.SourceEndMs,
+			Confidence:     m.Confidence,
+			WordStartIndex: m.WordStartIndex,
+			WordEndIndex:   m.WordEndIndex,
+			CreatedAt:      m.CreatedAt,
+		})
+	}
+	return out, nil
+}

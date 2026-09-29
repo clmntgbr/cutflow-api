@@ -50,3 +50,24 @@ func (r *detectedSilenceWriteRepository) CountByMediaFileID(ctx context.Context,
 		Count(&total).Error
 	return total, err
 }
+
+func (r *detectedSilenceWriteRepository) ListByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) ([]*domainsilence.DetectedSilence, error) {
+	var models []DetectedSilenceModel
+	if err := DBWithContext(ctx, r.db).
+		Where("media_file_id = ?", mediaFileID).
+		Order("start_ms ASC").
+		Find(&models).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainsilence.DetectedSilence, 0, len(models))
+	for _, m := range models {
+		out = append(out, &domainsilence.DetectedSilence{
+			ID:          m.ID,
+			MediaFileID: m.MediaFileID,
+			StartMs:     m.StartMs,
+			EndMs:       m.EndMs,
+			CreatedAt:   m.CreatedAt,
+		})
+	}
+	return out, nil
+}
