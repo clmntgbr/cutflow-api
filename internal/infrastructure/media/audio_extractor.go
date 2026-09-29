@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	domainmediaaudio "go-api/internal/domain/mediaaudio"
 )
 
 type AudioExtractor struct{}
@@ -14,7 +16,7 @@ func NewAudioExtractor() *AudioExtractor {
 	return &AudioExtractor{}
 }
 
-// Extract writes a mono 16 kHz PCM WAV suitable for silence detection and ASR.
+// Extract writes a mono 16 kHz Opus (~32 kbps) file for ASR and silence detection.
 func (e *AudioExtractor) Extract(ctx context.Context, videoPath, outputPath string) error {
 	cmd := exec.CommandContext(
 		ctx,
@@ -24,7 +26,8 @@ func (e *AudioExtractor) Extract(ctx context.Context, videoPath, outputPath stri
 		"-vn",
 		"-ac", "1",
 		"-ar", "16000",
-		"-c:a", "pcm_s16le",
+		"-c:a", "libopus",
+		"-b:a", domainmediaaudio.ExtractedBitrate,
 		outputPath,
 	)
 	var stderr bytes.Buffer

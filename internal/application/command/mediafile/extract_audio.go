@@ -83,7 +83,7 @@ func (h *ExtractAudioHandler) Handle(ctx context.Context, cmd ExtractAudioComman
 	defer os.Remove(src.Name())
 	defer src.Close()
 
-	out, err := os.CreateTemp("", "media-audio-*.wav")
+	out, err := os.CreateTemp("", "media-audio-*.opus")
 	if err != nil {
 		return messaging.Retryable(err)
 	}
@@ -122,7 +122,7 @@ func (h *ExtractAudioHandler) Handle(ctx context.Context, cmd ExtractAudioComman
 	}
 	defer file.Close()
 
-	if err := h.storage.Put(ctx, audio.StorageKey, file, info.Size(), "audio/wav"); err != nil {
+	if err := h.storage.Put(ctx, audio.StorageKey, file, info.Size(), domainmediaaudio.ExtractedContentType); err != nil {
 		return messaging.Retryable(err)
 	}
 

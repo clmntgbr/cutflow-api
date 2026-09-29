@@ -17,10 +17,12 @@ const (
 	StatusFailed     = "failed"
 	StatusCancelled  = "cancelled"
 
-	ExtractedCodec       = "pcm_s16le"
-	ExtractedSampleRate  = 16000
-	ExtractedChannels    = 1
-	ExtractedObjectName  = "audio.wav"
+	ExtractedCodec      = "opus"
+	ExtractedSampleRate = 16000
+	ExtractedChannels   = 1
+	ExtractedBitrate    = "32k"
+	ExtractedObjectName = "audio.opus"
+	ExtractedContentType = "audio/ogg"
 )
 
 type MediaAudio struct {
