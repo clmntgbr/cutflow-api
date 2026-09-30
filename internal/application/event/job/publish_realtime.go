@@ -36,6 +36,10 @@ func (h *PublishRealtimeHandler) OnCreated(ctx context.Context, payload []byte) 
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
 	}
+	// Editor listens to media_file.timeline_* only — never surface these jobs.
+	if evt.Name == domainjob.NameRebuildTimeline || evt.Name == domainjob.NameDetectSilence {
+		return nil
+	}
 	return h.publisher.ToUser(ctx, realtime.EntityJob, realtime.ActionCreated, evt.UserID, jobRealtimePayload{
 		JobID:       evt.JobID,
 		ProjectID:   evt.ProjectID,
@@ -50,6 +54,9 @@ func (h *PublishRealtimeHandler) OnStatusChanged(ctx context.Context, payload []
 	var evt domainjob.JobStatusChanged
 	if err := json.Unmarshal(payload, &evt); err != nil {
 		return messaging.NonRetryable(err)
+	}
+	if evt.Name == domainjob.NameRebuildTimeline || evt.Name == domainjob.NameDetectSilence {
+		return nil
 	}
 	return h.publisher.ToUser(ctx, realtime.EntityJob, realtime.ActionUpdated, evt.UserID, jobRealtimePayload{
 		JobID:        evt.JobID,

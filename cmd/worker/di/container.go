@@ -12,16 +12,10 @@ import (
 	eventuser "go-api/internal/application/event/user"
 	"go-api/internal/application/registry"
 	domainjob "go-api/internal/domain/job"
-	domainmediaaudio "go-api/internal/domain/mediaaudio"
-	domainmediaconfig "go-api/internal/domain/mediaconfig"
 	domainmediafile "go-api/internal/domain/mediafile"
 	domainproject "go-api/internal/domain/project"
-	domainsilence "go-api/internal/domain/silence"
-	domaintranscript "go-api/internal/domain/transcript"
-	domaintranscriptissue "go-api/internal/domain/transcriptissue"
 	domaintimeline "go-api/internal/domain/timeline"
 	domainuser "go-api/internal/domain/user"
-	domainviral "go-api/internal/domain/viral"
 	"go-api/internal/infrastructure/centrifugo"
 	"go-api/internal/infrastructure/config"
 	inframedia "go-api/internal/infrastructure/media"
@@ -148,65 +142,15 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		"publish_media_file_thumbnail_ready_realtime",
 		publishMediaRealtime.OnThumbnailReady,
 	))
-	reg.Register(domainmediafile.EventTypeMediaFileProbing, dedup.With(
-		dedupRepo,
-		"publish_media_file_probing_realtime",
-		publishMediaRealtime.OnProbing,
-	))
-	reg.Register(domainmediafile.EventTypeMediaFileReady, dedup.With(
-		dedupRepo,
-		"publish_media_file_ready_realtime",
-		publishMediaRealtime.OnReady,
-	))
-	reg.Register(domainmediafile.EventTypeMediaFileProbeFailed, dedup.With(
-		dedupRepo,
-		"publish_media_file_probe_failed_realtime",
-		publishMediaRealtime.OnProbeFailed,
-	))
-	reg.Register(domainmediaaudio.EventTypeMediaAudioReady, dedup.With(
-		dedupRepo,
-		"publish_media_file_audio_ready_realtime",
-		publishMediaRealtime.OnAudioReady,
-	))
-	reg.Register(domainmediaaudio.EventTypeMediaAudioFailed, dedup.With(
-		dedupRepo,
-		"publish_media_file_audio_failed_realtime",
-		publishMediaRealtime.OnAudioFailed,
-	))
-	reg.Register(domainsilence.EventTypeSilenceDetected, dedup.With(
-		dedupRepo,
-		"publish_media_file_silence_detected_realtime",
-		publishMediaRealtime.OnSilenceDetected,
-	))
-	reg.Register(domainmediaconfig.EventTypeConfigurationUpdated, dedup.With(
-		dedupRepo,
-		"publish_media_file_configuration_updated_realtime",
-		publishMediaRealtime.OnConfigurationUpdated,
-	))
-	reg.Register(domaintranscript.EventTypeTranscriptReady, dedup.With(
-		dedupRepo,
-		"publish_media_file_transcript_ready_realtime",
-		publishMediaRealtime.OnTranscriptReady,
-	))
-	reg.Register(domaintranscript.EventTypeTranscriptFailed, dedup.With(
-		dedupRepo,
-		"publish_media_file_transcript_failed_realtime",
-		publishMediaRealtime.OnTranscriptFailed,
-	))
-	reg.Register(domaintranscriptissue.EventTypeTranscriptAnalysisReady, dedup.With(
-		dedupRepo,
-		"publish_media_file_transcript_analysis_ready_realtime",
-		publishMediaRealtime.OnTranscriptAnalysisReady,
-	))
-	reg.Register(domainviral.EventTypeViralReady, dedup.With(
-		dedupRepo,
-		"publish_media_file_viral_ready_realtime",
-		publishMediaRealtime.OnViralReady,
-	))
 	reg.Register(domaintimeline.EventTypeTimelineUpdated, dedup.With(
 		dedupRepo,
 		"publish_media_file_timeline_updated_realtime",
 		publishMediaRealtime.OnTimelineUpdated,
+	))
+	reg.Register(domaintimeline.EventTypeTimelineFailed, dedup.With(
+		dedupRepo,
+		"publish_media_file_timeline_failed_realtime",
+		publishMediaRealtime.OnTimelineFailed,
 	))
 	reg.Register(domainproject.EventTypeProjectUpdated, dedup.With(
 		dedupRepo,

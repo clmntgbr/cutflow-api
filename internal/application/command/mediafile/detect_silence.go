@@ -120,7 +120,7 @@ func (h *DetectSilenceHandler) Handle(ctx context.Context, cmd DetectSilenceComm
 
 	thresholdDB, noiseFloorDB, err := h.resolveThreshold(ctx, tmp.Name(), cfg)
 	if err != nil {
-		if failErr := h.fail(ctx, cmd.JobID, "silence detection failed"); failErr != nil {
+		if failErr := h.fail(ctx, cmd, "silence detection failed"); failErr != nil {
 			return failErr
 		}
 		return messaging.NonRetryable(err)
@@ -130,7 +130,7 @@ func (h *DetectSilenceHandler) Handle(ctx context.Context, cmd DetectSilenceComm
 	// are applied later via silence.ApplyEditFilters (EditDecision / Timeline).
 	intervals, err := h.detector.Detect(ctx, tmp.Name(), thresholdDB, domainsilence.AnalysisMinSilenceMs)
 	if err != nil {
-		if failErr := h.fail(ctx, cmd.JobID, "silence detection failed"); failErr != nil {
+		if failErr := h.fail(ctx, cmd, "silence detection failed"); failErr != nil {
 			return failErr
 		}
 		return messaging.NonRetryable(err)
@@ -219,6 +219,7 @@ func (h *DetectSilenceHandler) persistResults(
 			ProjectID:    cmd.ProjectID.String(),
 			UserID:       cmd.UserID.String(),
 			SilenceCount: len(rows),
+			Force:        cmd.Force,
 			Timestamp:    time.Now().UTC(),
 		})
 		if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
@@ -282,22 +283,38 @@ func (h *DetectSilenceHandler) markProcessing(ctx context.Context, jobID uuid.UU
 	})
 }
 
-func (h *DetectSilenceHandler) fail(ctx context.Context, jobID uuid.UUID, reason string) error {
-	if jobID == uuid.Nil {
-		return nil
-	}
+func (h *DetectSilenceHandler) fail(ctx context.Context, cmd DetectSilenceCommand, reason string) error {
 	return h.jobRepo.WithTransaction(ctx, func(txCtx context.Context) error {
-		job, err := h.jobRepo.GetByID(txCtx, jobID)
-		if err != nil {
-			return messaging.Retryable(err)
+		events := make([]event.DomainEvent, 0, 2)
+		if cmd.JobID != uuid.Nil {
+			job, err := h.jobRepo.GetByID(txCtx, cmd.JobID)
+			if err != nil {
+				return messaging.Retryable(err)
+			}
+			if job == nil || job.Status == domainjob.StatusFailed {
+				return nil
+			}
+			job.MarkFailed(reason)
+			if err := h.jobRepo.Update(txCtx, job); err != nil {
+				return messaging.Retryable(err)
+			}
+			events = append(events, job.PullEvents()...)
 		}
-		if job == nil || job.Status == domainjob.StatusFailed {
+		// Editor waits on timeline_*; surface failures when silence redetect aborts the rebuild.
+		if cmd.Force {
+			events = append(events, domaintimeline.Failed{
+				ID:          uuid.New().String(),
+				MediaFileID: cmd.MediaFileID.String(),
+				ProjectID:   cmd.ProjectID.String(),
+				UserID:      cmd.UserID.String(),
+				JobID:       cmd.JobID.String(),
+				Reason:      reason,
+				Timestamp:   time.Now().UTC(),
+			})
+		}
+		if len(events) == 0 {
 			return nil
 		}
-		job.MarkFailed(reason)
-		if err := h.jobRepo.Update(txCtx, job); err != nil {
-			return messaging.Retryable(err)
-		}
-		return h.outbox.StoreEvents(txCtx, job.PullEvents())
+		return h.outbox.StoreEvents(txCtx, events)
 	})
 }

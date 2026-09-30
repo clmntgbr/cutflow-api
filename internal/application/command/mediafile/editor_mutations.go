@@ -498,17 +498,8 @@ func enqueueTimelineRebuild(
 	if err := jobRepo.Save(ctx, timelineJob); err != nil {
 		return uuid.Nil, messaging.Retryable(err)
 	}
-	events := make([]event.DomainEvent, 0, 3)
+	events := make([]event.DomainEvent, 0, 2)
 	events = append(events, timelineJob.PullEvents()...)
-	events = append(events, domainmediaconfig.ConfigurationUpdated{
-		ID:          uuid.New().String(),
-		MediaFileID: mediaFileID.String(),
-		ProjectID:   projectID.String(),
-		UserID:      userID.String(),
-		JobID:       timelineJob.ID.String(),
-		Reason:      reason,
-		Timestamp:   time.Now().UTC(),
-	})
 	events = append(events, domaintimeline.RebuildRequested{
 		ID:          uuid.New().String(),
 		MediaFileID: mediaFileID.String(),
@@ -544,17 +535,8 @@ func enqueueSilenceRedetection(
 	if err := jobRepo.Save(ctx, silenceJob); err != nil {
 		return uuid.Nil, messaging.Retryable(err)
 	}
-	events := make([]event.DomainEvent, 0, 3)
+	events := make([]event.DomainEvent, 0, 2)
 	events = append(events, silenceJob.PullEvents()...)
-	events = append(events, domainmediaconfig.ConfigurationUpdated{
-		ID:          uuid.New().String(),
-		MediaFileID: mediaFileID.String(),
-		ProjectID:   projectID.String(),
-		UserID:      userID.String(),
-		JobID:       silenceJob.ID.String(),
-		Reason:      "silence_redetect_requested",
-		Timestamp:   time.Now().UTC(),
-	})
 	events = append(events, domainmediafile.MediaFileSilenceRequested{
 		ID:          uuid.New().String(),
 		MediaFileID: mediaFileID.String(),

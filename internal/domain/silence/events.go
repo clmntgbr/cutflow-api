@@ -10,7 +10,9 @@ type SilenceDetected struct {
 	ProjectID    string    `json:"projectId"`
 	UserID       string    `json:"userId"`
 	SilenceCount int       `json:"silenceCount"`
-	Timestamp    time.Time `json:"timestamp"`
+	// Force marks an editor re-run (silence level change).
+	Force     bool      `json:"force,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 func (e SilenceDetected) EventID() string       { return e.ID }
