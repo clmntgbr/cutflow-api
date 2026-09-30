@@ -228,19 +228,30 @@ func (h *MediaFileHandler) updateConfiguration(
 		TimelineVersion: req.TimelineVersion,
 	}
 	cfg := req.Configuration
+	rebuild := false
 	if cfg.Filler != nil {
 		cmd.FillerEnabled = cfg.Filler.Enabled
+		rebuild = true
 	}
 	if cfg.Repetition != nil {
 		cmd.RepetitionEnabled = cfg.Repetition.Enabled
+		rebuild = true
 	}
 	if cfg.Subtitles != nil {
 		cmd.SubtitlesEnabled = cfg.Subtitles.Enabled
 		cmd.SubtitleMaxWords = cfg.Subtitles.MaxWords
 	}
+	cmd.RebuildTimeline = rebuild
 
-	if _, err := h.updateConfigurationHandler.Handle(c.Context(), cmd); err != nil {
+	result, err := h.updateConfigurationHandler.Handle(c.Context(), cmd)
+	if err != nil {
 		return h.mapEditorMutationError(c, err)
+	}
+	if rebuild && result != nil {
+		return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
+			result.JobID.String(),
+			result.PreviousTimelineVersion,
+		))
 	}
 	return c.SendStatus(fiber.StatusNoContent)
 }

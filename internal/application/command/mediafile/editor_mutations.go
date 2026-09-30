@@ -140,9 +140,10 @@ func (h *UpdateEditorConfigurationHandler) Handle(
 			}
 		}
 
-		var jobID uuid.UUID
+		// Analysis inputs (level / threshold) need a fresh ffmpeg pass first.
+		// Rebuild is chained after silence_redetected — do not rebuild on stale silences.
 		if needsRedetect {
-			jobID, err = enqueueSilenceRedetection(
+			jobID, err := enqueueSilenceRedetection(
 				txCtx,
 				h.audioRepo,
 				h.jobRepo,
@@ -151,17 +152,22 @@ func (h *UpdateEditorConfigurationHandler) Handle(
 				media.ID,
 				media.UserID,
 			)
-		} else {
-			jobID, err = enqueueTimelineRebuild(
-				txCtx,
-				h.jobRepo,
-				h.outbox,
-				media.ProjectID,
-				media.ID,
-				media.UserID,
-				"silence_configuration_updated",
-			)
+			if err != nil {
+				return err
+			}
+			result = &EditorMutationResult{JobID: jobID, PreviousTimelineVersion: prevVersion}
+			return nil
 		}
+
+		jobID, err := enqueueTimelineRebuild(
+			txCtx,
+			h.jobRepo,
+			h.outbox,
+			media.ProjectID,
+			media.ID,
+			media.UserID,
+			configurationRebuildReason(cmd),
+		)
 		if err != nil {
 			return err
 		}
@@ -250,6 +256,13 @@ func silenceAnalysisParamsChanging(cfg *domainmediaconfig.MediaConfiguration, pa
 		}
 	}
 	return false
+}
+
+func configurationRebuildReason(cmd UpdateEditorConfigurationCommand) string {
+	if cmd.Silence != nil {
+		return "silence_configuration_updated"
+	}
+	return "configuration_updated"
 }
 
 type OverrideDecisionCommand struct {
@@ -485,8 +498,17 @@ func enqueueTimelineRebuild(
 	if err := jobRepo.Save(ctx, timelineJob); err != nil {
 		return uuid.Nil, messaging.Retryable(err)
 	}
-	events := make([]event.DomainEvent, 0, 2)
+	events := make([]event.DomainEvent, 0, 3)
 	events = append(events, timelineJob.PullEvents()...)
+	events = append(events, domainmediaconfig.ConfigurationUpdated{
+		ID:          uuid.New().String(),
+		MediaFileID: mediaFileID.String(),
+		ProjectID:   projectID.String(),
+		UserID:      userID.String(),
+		JobID:       timelineJob.ID.String(),
+		Reason:      reason,
+		Timestamp:   time.Now().UTC(),
+	})
 	events = append(events, domaintimeline.RebuildRequested{
 		ID:          uuid.New().String(),
 		MediaFileID: mediaFileID.String(),
@@ -522,8 +544,17 @@ func enqueueSilenceRedetection(
 	if err := jobRepo.Save(ctx, silenceJob); err != nil {
 		return uuid.Nil, messaging.Retryable(err)
 	}
-	events := make([]event.DomainEvent, 0, 2)
+	events := make([]event.DomainEvent, 0, 3)
 	events = append(events, silenceJob.PullEvents()...)
+	events = append(events, domainmediaconfig.ConfigurationUpdated{
+		ID:          uuid.New().String(),
+		MediaFileID: mediaFileID.String(),
+		ProjectID:   projectID.String(),
+		UserID:      userID.String(),
+		JobID:       silenceJob.ID.String(),
+		Reason:      "silence_redetect_requested",
+		Timestamp:   time.Now().UTC(),
+	})
 	events = append(events, domainmediafile.MediaFileSilenceRequested{
 		ID:          uuid.New().String(),
 		MediaFileID: mediaFileID.String(),

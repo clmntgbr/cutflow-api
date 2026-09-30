@@ -12,9 +12,29 @@ func TestResolveSilenceThreshold_AutoUsesLevelOffset(t *testing.T) {
 	cfg.SilenceDetectionLevel = DetectionLevelAggressive
 
 	got := cfg.ResolveSilenceThreshold(-48)
-	// aggressive offset = +10 → -38
-	if got != -38 {
-		t.Fatalf("got %.1f want -38", got)
+	// aggressive offset = +12 → -36
+	if got != -36 {
+		t.Fatalf("got %.1f want -36", got)
+	}
+}
+
+func TestResolveSilenceThreshold_AutoLevelsStayDistinctForTypicalFloor(t *testing.T) {
+	cfg := NewDefault(mustParseUUID("11111111-1111-1111-1111-111111111111"))
+	cfg.SilenceThresholdMode = ThresholdModeAuto
+
+	floor := -30.0
+	cfg.SilenceDetectionLevel = DetectionLevelLow
+	low := cfg.ResolveSilenceThreshold(floor)
+	cfg.SilenceDetectionLevel = DetectionLevelModerate
+	moderate := cfg.ResolveSilenceThreshold(floor)
+	cfg.SilenceDetectionLevel = DetectionLevelAggressive
+	aggressive := cfg.ResolveSilenceThreshold(floor)
+	cfg.SilenceDetectionLevel = DetectionLevelVeryAggressive
+	very := cfg.ResolveSilenceThreshold(floor)
+
+	if !(low < moderate && moderate < aggressive && aggressive < very) {
+		t.Fatalf("expected distinct ascending thresholds, got low=%.1f moderate=%.1f aggressive=%.1f very=%.1f",
+			low, moderate, aggressive, very)
 	}
 }
 

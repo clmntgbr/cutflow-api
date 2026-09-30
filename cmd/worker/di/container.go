@@ -13,6 +13,7 @@ import (
 	"go-api/internal/application/registry"
 	domainjob "go-api/internal/domain/job"
 	domainmediaaudio "go-api/internal/domain/mediaaudio"
+	domainmediaconfig "go-api/internal/domain/mediaconfig"
 	domainmediafile "go-api/internal/domain/mediafile"
 	domainproject "go-api/internal/domain/project"
 	domainsilence "go-api/internal/domain/silence"
@@ -176,6 +177,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		dedupRepo,
 		"publish_media_file_silence_detected_realtime",
 		publishMediaRealtime.OnSilenceDetected,
+	))
+	reg.Register(domainmediaconfig.EventTypeConfigurationUpdated, dedup.With(
+		dedupRepo,
+		"publish_media_file_configuration_updated_realtime",
+		publishMediaRealtime.OnConfigurationUpdated,
 	))
 	reg.Register(domaintranscript.EventTypeTranscriptReady, dedup.With(
 		dedupRepo,

@@ -28,17 +28,18 @@ const (
 )
 
 // LevelOffsetDB is added to the estimated noise floor to get the silence threshold.
-// Higher offset → more aggressive (more audio counted as silence). Temporary calibration.
+// Higher offset → more aggressive (more audio counted as silence).
+// Spaced so levels stay distinct without wiping most speech at very_aggressive.
 func LevelOffsetDB(level string) float64 {
 	switch level {
 	case DetectionLevelLow:
-		return 6
+		return 4
 	case DetectionLevelModerate:
 		return 8
 	case DetectionLevelVeryAggressive:
-		return 14
+		return 16
 	default: // aggressive
-		return 10
+		return 12
 	}
 }
 
@@ -101,16 +102,17 @@ func NewDefault(mediaFileID uuid.UUID) *MediaConfiguration {
 
 // ResolveSilenceThreshold returns the dB threshold to use for silencedetect.
 // In auto mode, noiseFloorDB comes from audio analysis (mean/noise estimate).
+//
+// Threshold stays relative to the noise floor + level offset. Do not clamp toward
+// 0 dB: for typical floors around -25..-35 dB an upper clamp at -20 collapses
+// every detection level onto the same value and silence re-runs look like no-ops.
 func (c *MediaConfiguration) ResolveSilenceThreshold(noiseFloorDB float64) float64 {
 	if c.SilenceThresholdMode == ThresholdModeManual && c.SilenceThresholdDB != nil {
 		return *c.SilenceThresholdDB
 	}
 	threshold := noiseFloorDB + LevelOffsetDB(c.SilenceDetectionLevel)
 	if threshold < -60 {
-		threshold = -60
-	}
-	if threshold > -20 {
-		threshold = -20
+		return -60
 	}
 	return threshold
 }

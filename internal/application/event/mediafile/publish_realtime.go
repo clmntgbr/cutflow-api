@@ -8,6 +8,7 @@ import (
 	"go-api/internal/application/messaging"
 	"go-api/internal/application/realtime"
 	domainmediaaudio "go-api/internal/domain/mediaaudio"
+	domainmediaconfig "go-api/internal/domain/mediaconfig"
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
 	domainsilence "go-api/internal/domain/silence"
@@ -178,6 +179,19 @@ func (h *PublishRealtimeHandler) OnSilenceDetected(ctx context.Context, payload 
 		ProjectID:    evt.ProjectID,
 		SilenceCount: evt.SilenceCount,
 		OccurredAt:   evt.Timestamp,
+	})
+}
+
+func (h *PublishRealtimeHandler) OnConfigurationUpdated(ctx context.Context, payload []byte) error {
+	var evt domainmediaconfig.ConfigurationUpdated
+	if err := json.Unmarshal(payload, &evt); err != nil {
+		return messaging.NonRetryable(err)
+	}
+	return h.publisher.ToUser(ctx, realtime.EntityMediaFile, realtime.ActionConfigurationUpdated, evt.UserID, mediaFileRealtimePayload{
+		MediaFileID: evt.MediaFileID,
+		ProjectID:   evt.ProjectID,
+		Reason:      evt.Reason,
+		OccurredAt:  evt.Timestamp,
 	})
 }
 

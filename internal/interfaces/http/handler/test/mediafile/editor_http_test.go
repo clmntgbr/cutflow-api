@@ -150,14 +150,14 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_Success(t *testing.T)
 	if err != nil {
 		t.Fatalf("perform request: %v", err)
 	}
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 	if !update.called || update.cmd.FillerEnabled == nil || *update.cmd.FillerEnabled != false {
 		t.Fatalf("cmd: %#v", update.cmd)
 	}
-	if update.cmd.RebuildTimeline {
-		t.Fatal("update_configuration must not rebuild")
+	if !update.cmd.RebuildTimeline {
+		t.Fatal("filler/repetition toggle must rebuild timeline")
 	}
 }
 
@@ -276,11 +276,38 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_WithToggles(t *testin
 	if err != nil {
 		t.Fatalf("perform request: %v", err)
 	}
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 	if update.cmd.FillerEnabled == nil || *update.cmd.FillerEnabled != false {
 		t.Fatalf("filler: %#v", update.cmd.FillerEnabled)
+	}
+	if !update.cmd.RebuildTimeline {
+		t.Fatal("expected rebuild")
+	}
+}
+
+func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_SubtitlesOnly_NoRebuild(t *testing.T) {
+	update := &mockUpdateConfigurationHandler{}
+	h := newMediaFileHandlerFull(nil, nil, update, nil, nil, nil)
+	app := testutil.NewTestApp()
+	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
+	enabled := false
+	req, _ := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
+		"type": dto.EditorActionUpdateConfiguration,
+		"configuration": map[string]any{
+			"subtitles": map[string]any{"enabled": enabled, "maxWords": 5},
+		},
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("perform request: %v", err)
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("status: got %d", resp.StatusCode)
+	}
+	if update.cmd.RebuildTimeline {
+		t.Fatal("subtitles-only must not rebuild")
 	}
 }
 
