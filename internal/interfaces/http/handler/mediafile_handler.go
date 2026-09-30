@@ -153,6 +153,8 @@ func (h *MediaFileHandler) UpdateEditor(c fiber.Ctx) error {
 	switch req.Type {
 	case dto.EditorActionUpdateConfiguration:
 		return h.updateConfiguration(c, mediaFileID, user.ID, req)
+	case dto.EditorActionUpdateSilenceConfiguration:
+		return h.updateSilenceConfiguration(c, mediaFileID, user.ID, req)
 	case dto.EditorActionOverrideDecision:
 		return h.overrideDecision(c, mediaFileID, user.ID, req)
 	case dto.EditorActionClearDecisionOverride:
@@ -215,23 +217,17 @@ func (h *MediaFileHandler) updateConfiguration(
 	if req.Configuration == nil {
 		return h.editorValidationError(c, fiber.Map{"configuration": "is required"})
 	}
+	if req.Configuration.Silence != nil {
+		return h.editorValidationError(c, fiber.Map{
+			"configuration.silence": "use update_silence_configuration",
+		})
+	}
 	cmd := cmdmediafile.UpdateEditorConfigurationCommand{
 		MediaFileID:     mediaFileID,
 		UserID:          userID,
 		TimelineVersion: req.TimelineVersion,
 	}
 	cfg := req.Configuration
-	if cfg.Silence != nil {
-		cmd.Silence = &cmdmediafile.SilenceConfigPatch{
-			Enabled:         cfg.Silence.Enabled,
-			ThresholdMode:   cfg.Silence.ThresholdMode,
-			DetectionLevel:  cfg.Silence.DetectionLevel,
-			MinDurationMs:   cfg.Silence.MinDurationMs,
-			PaddingBeforeMs: cfg.Silence.PaddingBeforeMs,
-			PaddingAfterMs:  cfg.Silence.PaddingAfterMs,
-			ThresholdDB:     cfg.Silence.ThresholdDB,
-		}
-	}
 	if cfg.Filler != nil {
 		cmd.FillerEnabled = cfg.Filler.Enabled
 	}
@@ -243,10 +239,45 @@ func (h *MediaFileHandler) updateConfiguration(
 		cmd.SubtitleMaxWords = cfg.Subtitles.MaxWords
 	}
 
-	if err := h.updateConfigurationHandler.Handle(c.Context(), cmd); err != nil {
+	if _, err := h.updateConfigurationHandler.Handle(c.Context(), cmd); err != nil {
 		return h.mapEditorMutationError(c, err)
 	}
 	return c.SendStatus(fiber.StatusNoContent)
+}
+
+func (h *MediaFileHandler) updateSilenceConfiguration(
+	c fiber.Ctx,
+	mediaFileID, userID uuid.UUID,
+	req dto.UpdateEditorRequest,
+) error {
+	if req.Configuration == nil || req.Configuration.Silence == nil {
+		return h.editorValidationError(c, fiber.Map{"configuration.silence": "is required"})
+	}
+	s := req.Configuration.Silence
+	cmd := cmdmediafile.UpdateEditorConfigurationCommand{
+		MediaFileID:     mediaFileID,
+		UserID:          userID,
+		TimelineVersion: req.TimelineVersion,
+		Silence: &cmdmediafile.SilenceConfigPatch{
+			Enabled:         s.Enabled,
+			ThresholdMode:   s.ThresholdMode,
+			DetectionLevel:  s.DetectionLevel,
+			MinDurationMs:   s.MinDurationMs,
+			PaddingBeforeMs: s.PaddingBeforeMs,
+			PaddingAfterMs:  s.PaddingAfterMs,
+			ThresholdDB:     s.ThresholdDB,
+		},
+		RebuildTimeline: true,
+	}
+
+	result, err := h.updateConfigurationHandler.Handle(c.Context(), cmd)
+	if err != nil {
+		return h.mapEditorMutationError(c, err)
+	}
+	return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
+		result.JobID.String(),
+		result.PreviousTimelineVersion,
+	))
 }
 
 func (h *MediaFileHandler) overrideDecision(

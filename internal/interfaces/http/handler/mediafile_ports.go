@@ -18,7 +18,7 @@ type mediaFileGetEditorHandler interface {
 }
 
 type mediaFileUpdateConfigurationHandler interface {
-	Handle(ctx context.Context, cmd cmdmediafile.UpdateEditorConfigurationCommand) error
+	Handle(ctx context.Context, cmd cmdmediafile.UpdateEditorConfigurationCommand) (*cmdmediafile.EditorMutationResult, error)
 }
 
 type mediaFileDecisionMutationHandler interface {

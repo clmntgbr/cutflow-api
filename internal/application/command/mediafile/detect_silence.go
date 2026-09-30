@@ -26,6 +26,9 @@ type DetectSilenceCommand struct {
 	ProjectID   uuid.UUID
 	UserID      uuid.UUID
 	JobID       uuid.UUID
+	// Force re-runs ffmpeg analysis even when DetectedSilence rows already exist
+	// (editor changed detection level / threshold).
+	Force bool
 }
 
 type DetectSilenceHandler struct {
@@ -85,12 +88,14 @@ func (h *DetectSilenceHandler) Handle(ctx context.Context, cmd DetectSilenceComm
 		return h.persistResults(ctx, cmd, nil)
 	}
 
-	existing, err := h.silenceRepo.CountByMediaFileID(ctx, cmd.MediaFileID)
-	if err != nil {
-		return messaging.Retryable(err)
-	}
-	if existing > 0 {
-		return h.persistResults(ctx, cmd, nil)
+	if !cmd.Force {
+		existing, err := h.silenceRepo.CountByMediaFileID(ctx, cmd.MediaFileID)
+		if err != nil {
+			return messaging.Retryable(err)
+		}
+		if existing > 0 {
+			return h.persistResults(ctx, cmd, nil)
+		}
 	}
 
 	tmp, err := os.CreateTemp("", "media-silence-*.opus")
@@ -183,23 +188,27 @@ func (h *DetectSilenceHandler) persistResults(
 	}
 
 	return h.silenceRepo.WithTransaction(ctx, func(txCtx context.Context) error {
-		count, err := h.silenceRepo.CountByMediaFileID(txCtx, cmd.MediaFileID)
-		if err != nil {
-			return messaging.Retryable(err)
-		}
 		events := make([]event.DomainEvent, 0, 4)
-		if count > 0 {
-			if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
-				return err
+
+		if !cmd.Force {
+			count, err := h.silenceRepo.CountByMediaFileID(txCtx, cmd.MediaFileID)
+			if err != nil {
+				return messaging.Retryable(err)
 			}
-			if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "silence_detected"); err != nil {
-				return err
+			if count > 0 {
+				if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
+					return err
+				}
+				if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "silence_detected"); err != nil {
+					return err
+				}
+				if len(events) == 0 {
+					return nil
+				}
+				return h.outbox.StoreEvents(txCtx, events)
 			}
-			if len(events) == 0 {
-				return nil
-			}
-			return h.outbox.StoreEvents(txCtx, events)
 		}
+
 		if err := h.silenceRepo.ReplaceForMediaFile(txCtx, cmd.MediaFileID, rows); err != nil {
 			return messaging.Retryable(err)
 		}
@@ -215,7 +224,11 @@ func (h *DetectSilenceHandler) persistResults(
 		if err := h.markJobSuccessEvents(txCtx, cmd.JobID, &events); err != nil {
 			return err
 		}
-		if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, "silence_detected"); err != nil {
+		reason := "silence_detected"
+		if cmd.Force {
+			reason = "silence_redetected"
+		}
+		if err := appendTimelineRebuildIfReady(txCtx, h.timelineDeps(), &events, cmd.ProjectID, cmd.MediaFileID, cmd.UserID, reason); err != nil {
 			return err
 		}
 		return h.outbox.StoreEvents(txCtx, events)

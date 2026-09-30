@@ -1,10 +1,11 @@
 package dto
 
 const (
-	EditorActionUpdateConfiguration   = "update_configuration"
-	EditorActionOverrideDecision      = "override_decision"
-	EditorActionClearDecisionOverride = "clear_decision_override"
-	EditorActionCreateManualCut       = "create_manual_cut"
+	EditorActionUpdateConfiguration         = "update_configuration"
+	EditorActionUpdateSilenceConfiguration  = "update_silence_configuration"
+	EditorActionOverrideDecision            = "override_decision"
+	EditorActionClearDecisionOverride       = "clear_decision_override"
+	EditorActionCreateManualCut             = "create_manual_cut"
 )
 
 // UpdateEditorRequest is the unified PATCH /editor body (one action per request).

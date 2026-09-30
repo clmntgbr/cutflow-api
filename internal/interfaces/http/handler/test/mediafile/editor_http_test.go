@@ -134,13 +134,13 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_Success(t *testing.T)
 	h := newMediaFileHandlerFull(nil, nil, update, nil, nil, nil)
 	app := testutil.NewTestApp()
 	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
-	minMs := 800
+	enabled := false
 	version := 4
 	req, err := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
 		"type":            dto.EditorActionUpdateConfiguration,
 		"timelineVersion": version,
 		"configuration": map[string]any{
-			"silence": map[string]any{"minDurationMs": minMs},
+			"filler": map[string]any{"enabled": enabled},
 		},
 	})
 	if err != nil {
@@ -153,8 +153,108 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_Success(t *testing.T)
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
-	if !update.called || update.cmd.Silence == nil || update.cmd.Silence.MinDurationMs == nil || *update.cmd.Silence.MinDurationMs != 800 {
+	if !update.called || update.cmd.FillerEnabled == nil || *update.cmd.FillerEnabled != false {
 		t.Fatalf("cmd: %#v", update.cmd)
+	}
+	if update.cmd.RebuildTimeline {
+		t.Fatal("update_configuration must not rebuild")
+	}
+}
+
+func TestMediaFileHandler_UpdateEditor_UpdateSilenceConfiguration_Success(t *testing.T) {
+	update := &mockUpdateConfigurationHandler{}
+	h := newMediaFileHandlerFull(nil, nil, update, nil, nil, nil)
+	app := testutil.NewTestApp()
+	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
+	minMs := 800
+	version := 4
+	req, err := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
+		"type":            dto.EditorActionUpdateSilenceConfiguration,
+		"timelineVersion": version,
+		"configuration": map[string]any{
+			"silence": map[string]any{"minDurationMs": minMs},
+		},
+	})
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("perform request: %v", err)
+	}
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("status: got %d", resp.StatusCode)
+	}
+	if !update.called || !update.cmd.RebuildTimeline {
+		t.Fatalf("cmd: %#v", update.cmd)
+	}
+	if update.cmd.Silence == nil || update.cmd.Silence.MinDurationMs == nil || *update.cmd.Silence.MinDurationMs != 800 {
+		t.Fatalf("silence: %#v", update.cmd.Silence)
+	}
+	var out presenter.EditorRebuildAcceptedResponse
+	testutil.DecodeJSON(t, resp, &out)
+	if out.Status != "accepted" || out.JobID == "" || out.PreviousTimelineVersion != 4 {
+		t.Fatalf("response: %#v", out)
+	}
+}
+
+func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_RejectsSilence(t *testing.T) {
+	update := &mockUpdateConfigurationHandler{}
+	h := newMediaFileHandlerFull(nil, nil, update, nil, nil, nil)
+	app := testutil.NewTestApp()
+	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
+	req, _ := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
+		"type": dto.EditorActionUpdateConfiguration,
+		"configuration": map[string]any{
+			"silence": map[string]any{"minDurationMs": 800},
+		},
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("perform request: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: got %d", resp.StatusCode)
+	}
+	if update.called {
+		t.Fatal("must not call handler when silence is sent via update_configuration")
+	}
+}
+
+func TestMediaFileHandler_UpdateEditor_UpdateSilenceConfiguration_MissingSilence(t *testing.T) {
+	h := newMediaFileHandlerFull(nil, nil, nil, nil, nil, nil)
+	app := testutil.NewTestApp()
+	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
+	req, _ := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
+		"type":          dto.EditorActionUpdateSilenceConfiguration,
+		"configuration": map[string]any{},
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("perform request: %v", err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status: got %d", resp.StatusCode)
+	}
+}
+
+func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_HandlerError(t *testing.T) {
+	update := &mockUpdateConfigurationHandler{err: errUnexpected}
+	h := newMediaFileHandlerFull(nil, nil, update, nil, nil, nil)
+	app := testutil.NewTestApp()
+	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
+	req, _ := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
+		"type": dto.EditorActionUpdateConfiguration,
+		"configuration": map[string]any{
+			"filler": map[string]any{"enabled": true},
+		},
+	})
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("perform request: %v", err)
+	}
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 }
 
@@ -373,7 +473,7 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_StaleTimeline(t *test
 	app := testutil.NewTestApp()
 	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
 	req, _ := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
-		"type":            dto.EditorActionUpdateConfiguration,
+		"type":            dto.EditorActionUpdateSilenceConfiguration,
 		"timelineVersion": 5,
 		"configuration": map[string]any{
 			"silence": map[string]any{"minDurationMs": 800},

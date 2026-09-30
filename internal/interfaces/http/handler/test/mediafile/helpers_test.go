@@ -50,16 +50,29 @@ func (m *mockGetEditorHandler) Handle(
 type mockUpdateConfigurationHandler struct {
 	called bool
 	cmd    cmdmediafile.UpdateEditorConfigurationCommand
+	result *cmdmediafile.EditorMutationResult
 	err    error
 }
 
 func (m *mockUpdateConfigurationHandler) Handle(
 	_ context.Context,
 	cmd cmdmediafile.UpdateEditorConfigurationCommand,
-) error {
+) (*cmdmediafile.EditorMutationResult, error) {
 	m.called = true
 	m.cmd = cmd
-	return m.err
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.result != nil {
+		return m.result, nil
+	}
+	if cmd.RebuildTimeline {
+		return &cmdmediafile.EditorMutationResult{
+			JobID:                   uuid.MustParse("01960000-0000-7000-8000-000000000020"),
+			PreviousTimelineVersion: 4,
+		}, nil
+	}
+	return nil, nil
 }
 
 type mockDecisionMutationHandler struct {

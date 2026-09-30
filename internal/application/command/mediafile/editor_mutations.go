@@ -10,6 +10,7 @@ import (
 	querymediafile "go-api/internal/application/query/mediafile"
 	"go-api/internal/domain/event"
 	domainjob "go-api/internal/domain/job"
+	domainmediaaudio "go-api/internal/domain/mediaaudio"
 	domainmediaconfig "go-api/internal/domain/mediaconfig"
 	domainmediafile "go-api/internal/domain/mediafile"
 	"go-api/internal/domain/port"
@@ -46,6 +47,8 @@ type UpdateEditorConfigurationCommand struct {
 	RepetitionEnabled *bool
 	SubtitlesEnabled  *bool
 	SubtitleMaxWords  *int
+	// RebuildTimeline enqueues a timeline rebuild (used for silence config changes).
+	RebuildTimeline bool
 }
 
 type SilenceConfigPatch struct {
@@ -58,36 +61,53 @@ type SilenceConfigPatch struct {
 	ThresholdDB     *float64
 }
 
+// EditorMutationResult is returned when an editor change enqueues a timeline rebuild.
+type EditorMutationResult struct {
+	JobID                   uuid.UUID
+	PreviousTimelineVersion int
+}
+
 type UpdateEditorConfigurationHandler struct {
 	mediaRepo    domainmediafile.MediaFileWriteRepository
+	audioRepo    domainmediaaudio.MediaAudioWriteRepository
 	configRepo   domainmediaconfig.MediaConfigurationWriteRepository
 	timelineRepo ActiveTimelineVersionFinder
+	jobRepo      domainjob.JobWriteRepository
+	outbox       port.OutboxRepository
 }
 
 func NewUpdateEditorConfigurationHandler(
 	mediaRepo domainmediafile.MediaFileWriteRepository,
+	audioRepo domainmediaaudio.MediaAudioWriteRepository,
 	configRepo domainmediaconfig.MediaConfigurationWriteRepository,
 	timelineRepo ActiveTimelineVersionFinder,
+	jobRepo domainjob.JobWriteRepository,
+	outbox port.OutboxRepository,
 ) *UpdateEditorConfigurationHandler {
 	return &UpdateEditorConfigurationHandler{
 		mediaRepo:    mediaRepo,
+		audioRepo:    audioRepo,
 		configRepo:   configRepo,
 		timelineRepo: timelineRepo,
+		jobRepo:      jobRepo,
+		outbox:       outbox,
 	}
 }
 
 func (h *UpdateEditorConfigurationHandler) Handle(
 	ctx context.Context,
 	cmd UpdateEditorConfigurationCommand,
-) error {
-	if _, err := h.requireOwnedMedia(ctx, cmd.MediaFileID, cmd.UserID); err != nil {
-		return err
+) (*EditorMutationResult, error) {
+	media, err := h.requireOwnedMedia(ctx, cmd.MediaFileID, cmd.UserID)
+	if err != nil {
+		return nil, err
 	}
 	if err := assertTimelineVersion(ctx, h.timelineRepo, cmd.MediaFileID, cmd.TimelineVersion); err != nil {
-		return err
+		return nil, err
 	}
 
-	return h.configRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+	var result *EditorMutationResult
+	err = h.configRepo.WithTransaction(ctx, func(txCtx context.Context) error {
 		cfg, err := h.configRepo.GetByMediaFileID(txCtx, cmd.MediaFileID)
 		if err != nil {
 			return messaging.Retryable(err)
@@ -98,13 +118,60 @@ func (h *UpdateEditorConfigurationHandler) Handle(
 				return messaging.Retryable(err)
 			}
 		}
+		needsRedetect := silenceAnalysisParamsChanging(cfg, cmd.Silence)
 		applyConfigurationPatch(cfg, cmd)
 		cfg.UpdatedAt = time.Now().UTC()
 		if err := h.configRepo.Update(txCtx, cfg); err != nil {
 			return messaging.Retryable(err)
 		}
+		if !cmd.RebuildTimeline {
+			return nil
+		}
+		prevVersion := 0
+		if cmd.TimelineVersion != nil {
+			prevVersion = *cmd.TimelineVersion
+		} else {
+			tl, err := h.timelineRepo.GetActiveByMediaFileID(txCtx, cmd.MediaFileID)
+			if err != nil {
+				return messaging.Retryable(err)
+			}
+			if tl != nil {
+				prevVersion = tl.Version
+			}
+		}
+
+		var jobID uuid.UUID
+		if needsRedetect {
+			jobID, err = enqueueSilenceRedetection(
+				txCtx,
+				h.audioRepo,
+				h.jobRepo,
+				h.outbox,
+				media.ProjectID,
+				media.ID,
+				media.UserID,
+			)
+		} else {
+			jobID, err = enqueueTimelineRebuild(
+				txCtx,
+				h.jobRepo,
+				h.outbox,
+				media.ProjectID,
+				media.ID,
+				media.UserID,
+				"silence_configuration_updated",
+			)
+		}
+		if err != nil {
+			return err
+		}
+		result = &EditorMutationResult{JobID: jobID, PreviousTimelineVersion: prevVersion}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (h *UpdateEditorConfigurationHandler) requireOwnedMedia(
@@ -159,6 +226,30 @@ func applyConfigurationPatch(cfg *domainmediaconfig.MediaConfiguration, cmd Upda
 	if cmd.SubtitleMaxWords != nil {
 		cfg.SubtitleMaxWords = *cmd.SubtitleMaxWords
 	}
+}
+
+// silenceAnalysisParamsChanging reports whether the patch touches ffmpeg analysis
+// inputs (threshold / aggressiveness). Those require re-detection; min duration and
+// paddings only need a timeline rebuild over existing raw silences.
+func silenceAnalysisParamsChanging(cfg *domainmediaconfig.MediaConfiguration, patch *SilenceConfigPatch) bool {
+	if patch == nil {
+		return false
+	}
+	if patch.DetectionLevel != nil && *patch.DetectionLevel != cfg.SilenceDetectionLevel {
+		return true
+	}
+	if patch.ThresholdMode != nil && *patch.ThresholdMode != cfg.SilenceThresholdMode {
+		return true
+	}
+	if patch.ThresholdDB != nil {
+		if cfg.SilenceThresholdDB == nil || *cfg.SilenceThresholdDB != *patch.ThresholdDB {
+			return true
+		}
+		if cfg.SilenceThresholdMode != domainmediaconfig.ThresholdModeManual {
+			return true
+		}
+	}
+	return false
 }
 
 type OverrideDecisionCommand struct {
@@ -410,4 +501,42 @@ func enqueueTimelineRebuild(
 		return uuid.Nil, err
 	}
 	return timelineJob.ID, nil
+}
+
+func enqueueSilenceRedetection(
+	ctx context.Context,
+	audioRepo domainmediaaudio.MediaAudioWriteRepository,
+	jobRepo domainjob.JobWriteRepository,
+	outbox port.OutboxRepository,
+	projectID, mediaFileID, userID uuid.UUID,
+) (uuid.UUID, error) {
+	audio, err := audioRepo.GetByMediaFileID(ctx, mediaFileID)
+	if err != nil {
+		return uuid.Nil, messaging.Retryable(err)
+	}
+	if audio == nil || audio.StorageKey == "" {
+		return uuid.Nil, messaging.NonRetryable(querymediafile.ErrEditorNotReady)
+	}
+
+	silenceJob := domainjob.New(projectID, mediaFileID, userID, domainjob.NameDetectSilence)
+	if err := jobRepo.Save(ctx, silenceJob); err != nil {
+		return uuid.Nil, messaging.Retryable(err)
+	}
+	events := make([]event.DomainEvent, 0, 2)
+	events = append(events, silenceJob.PullEvents()...)
+	events = append(events, domainmediafile.MediaFileSilenceRequested{
+		ID:          uuid.New().String(),
+		MediaFileID: mediaFileID.String(),
+		ProjectID:   projectID.String(),
+		UserID:      userID.String(),
+		JobID:       silenceJob.ID.String(),
+		AudioKey:    audio.StorageKey,
+		Force:       true,
+		Timestamp:   time.Now().UTC(),
+	})
+	log.Printf("silence redetection requested mediaFileId=%s jobId=%s", mediaFileID, silenceJob.ID)
+	if err := outbox.StoreEvents(ctx, events); err != nil {
+		return uuid.Nil, err
+	}
+	return silenceJob.ID, nil
 }

@@ -46,13 +46,14 @@ func (h *DetectSilenceOnRequestedHandler) Handle(ctx context.Context, payload []
 		}
 	}
 
-	log.Printf("silence worker received mediaFileId=%s jobId=%s", evt.MediaFileID, evt.JobID)
+	log.Printf("silence worker received mediaFileId=%s jobId=%s force=%t", evt.MediaFileID, evt.JobID, evt.Force)
 	return h.detect.Handle(ctx, cmdmediafile.DetectSilenceCommand{
 		MediaFileID: mediaFileID,
 		AudioKey:    evt.AudioKey,
 		ProjectID:   projectID,
 		UserID:      userID,
 		JobID:       jobID,
+		Force:       evt.Force,
 	})
 }
 

@@ -210,3 +210,19 @@ func NewFinalizeAcceptedResponse(jobID, timelineID string, previousVersion int) 
 		PreviousTimelineVersion: previousVersion,
 	}
 }
+
+// EditorRebuildAcceptedResponse is returned when an editor action enqueues a timeline rebuild.
+// Frontend should wait for realtime media_file.timeline_updated then GET /editor.
+type EditorRebuildAcceptedResponse struct {
+	Status                  string `json:"status"`
+	JobID                   string `json:"jobId"`
+	PreviousTimelineVersion int    `json:"previousTimelineVersion"`
+}
+
+func NewEditorRebuildAcceptedResponse(jobID string, previousVersion int) EditorRebuildAcceptedResponse {
+	return EditorRebuildAcceptedResponse{
+		Status:                  "accepted",
+		JobID:                   jobID,
+		PreviousTimelineVersion: previousVersion,
+	}
+}

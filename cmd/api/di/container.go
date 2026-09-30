@@ -94,8 +94,11 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	)
 	updateEditorConfigurationHandler := cmdmediafile.NewUpdateEditorConfigurationHandler(
 		mediaFileWriteRepo,
+		write.NewMediaAudioWriteRepository(db),
 		write.NewMediaConfigurationWriteRepository(db),
 		write.NewTimelineWriteRepository(db),
+		write.NewJobWriteRepository(db),
+		outboxRepo,
 	)
 	decisionMutationHandler := cmdmediafile.NewDecisionMutationHandler(
 		mediaFileWriteRepo,

@@ -136,6 +136,7 @@ type MediaFileSilenceRequested struct {
 	UserID      string    `json:"userId"`
 	JobID       string    `json:"jobId"`
 	AudioKey    string    `json:"audioKey"`
+	Force       bool      `json:"force,omitempty"`
 	Timestamp   time.Time `json:"timestamp"`
 }
 
