@@ -50,3 +50,21 @@ func (r *viralCandidateWriteRepository) CountByMediaFileID(ctx context.Context, 
 		Count(&total).Error
 	return total, err
 }
+
+func (r *viralCandidateWriteRepository) ListByMediaFileID(
+	ctx context.Context,
+	mediaFileID uuid.UUID,
+) ([]*domainviral.Candidate, error) {
+	var models []ViralCandidateModel
+	if err := DBWithContext(ctx, r.db).
+		Where("media_file_id = ?", mediaFileID).
+		Order("score DESC, source_start_ms ASC").
+		Find(&models).Error; err != nil {
+		return nil, err
+	}
+	out := make([]*domainviral.Candidate, 0, len(models))
+	for i := range models {
+		out = append(out, viralCandidateDomainFromModel(&models[i]))
+	}
+	return out, nil
+}

@@ -51,3 +51,25 @@ func viralCandidateModelFromDomain(c *domainviral.Candidate) *ViralCandidateMode
 		CreatedAt:       c.CreatedAt,
 	}
 }
+
+func viralCandidateDomainFromModel(m *ViralCandidateModel) *domainviral.Candidate {
+	return &domainviral.Candidate{
+		ID:              m.ID,
+		MediaFileID:     m.MediaFileID,
+		ProjectID:       m.ProjectID,
+		SourceStartMs:   m.SourceStartMs,
+		SourceEndMs:     m.SourceEndMs,
+		Score:           m.Score,
+		HookScore:       m.HookScore,
+		StandaloneScore: m.StandaloneScore,
+		PayoffScore:     m.PayoffScore,
+		InterestScore:   m.InterestScore,
+		Title:           m.Title,
+		Hook:            m.Hook,
+		Reason:          m.Reason,
+		Provider:        m.Provider,
+		Model:           m.Model,
+		Selected:        m.Selected,
+		CreatedAt:       m.CreatedAt,
+	}
+}

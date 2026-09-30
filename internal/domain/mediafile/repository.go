@@ -19,10 +19,21 @@ type MediaFileWriteRepository interface {
 
 type MediaFileReadRepository interface {
 	FindOwnedByID(ctx context.Context, id, userID uuid.UUID) (*MediaFileThumbnailView, error)
+	FindOwnedForEditor(ctx context.Context, id, userID uuid.UUID) (*MediaFileEditorView, error)
 }
 
 // MediaFileThumbnailView carries the fields needed to stream a thumbnail.
 type MediaFileThumbnailView struct {
 	ID           uuid.UUID
 	ThumbnailKey string
+}
+
+// MediaFileEditorView carries media fields needed by the editor read model.
+type MediaFileEditorView struct {
+	ID               uuid.UUID
+	OriginalFilename string
+	StorageKey       string
+	DurationMs       int64
+	Width            *int
+	Height           *int
 }

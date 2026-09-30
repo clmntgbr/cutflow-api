@@ -81,6 +81,36 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 	listProjectsHandler := queryproject.NewListProjectsHandler(projectReadRepo)
 	getProjectByIDHandler := queryproject.NewGetProjectByIDHandler(projectReadRepo, minioStorage)
 	getOwnedMediaFileHandler := querymediafile.NewGetOwnedMediaFileHandler(mediaFileReadRepo)
+	getEditorStateHandler := querymediafile.NewGetEditorStateHandler(
+		mediaFileReadRepo,
+		write.NewMediaConfigurationWriteRepository(db),
+		write.NewDetectedSilenceWriteRepository(db),
+		write.NewDetectedTranscriptIssueWriteRepository(db),
+		write.NewUserOverrideRepository(db),
+		read.NewEditorTimelineRepository(db),
+		write.NewTranscriptWriteRepository(db),
+		write.NewViralCandidateWriteRepository(db),
+		minioStorage,
+	)
+	updateEditorConfigurationHandler := cmdmediafile.NewUpdateEditorConfigurationHandler(
+		mediaFileWriteRepo,
+		write.NewMediaConfigurationWriteRepository(db),
+		write.NewTimelineWriteRepository(db),
+	)
+	decisionMutationHandler := cmdmediafile.NewDecisionMutationHandler(
+		mediaFileWriteRepo,
+		write.NewMediaConfigurationWriteRepository(db),
+		write.NewDetectedSilenceWriteRepository(db),
+		write.NewDetectedTranscriptIssueWriteRepository(db),
+		write.NewUserOverrideRepository(db),
+		write.NewTimelineWriteRepository(db),
+	)
+	finalizeEditorHandler := cmdmediafile.NewFinalizeEditorHandler(
+		mediaFileWriteRepo,
+		write.NewTimelineWriteRepository(db),
+		write.NewJobWriteRepository(db),
+		outboxRepo,
+	)
 
 	return &Container{
 		AuthenticateMiddleware: middleware.NewAuthenticateMiddleware(
@@ -103,7 +133,14 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 			listProjectsHandler,
 			getProjectByIDHandler,
 		),
-		MediaFileHandler: httphandler.NewMediaFileHandler(getOwnedMediaFileHandler, minioStorage),
-		RealtimeHandler:  httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
+		MediaFileHandler: httphandler.NewMediaFileHandler(
+			getOwnedMediaFileHandler,
+			getEditorStateHandler,
+			updateEditorConfigurationHandler,
+			decisionMutationHandler,
+			finalizeEditorHandler,
+			minioStorage,
+		),
+		RealtimeHandler: httphandler.NewRealtimeHandler(centrifugo.NewConnectionInfoCreator(env)),
 	}
 }

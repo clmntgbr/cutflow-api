@@ -45,6 +45,7 @@ func (d Decision) DurationMs() int64 {
 
 // Override is an explicit user KEEP/REMOVE on a SOURCE TIME range.
 type Override struct {
+	ID            uuid.UUID
 	MediaFileID   uuid.UUID
 	Type          string
 	SourceStartMs int64

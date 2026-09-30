@@ -55,4 +55,7 @@ func setupProjectRoutes(api fiber.Router, container *di.Container) {
 
 func setupMediaFileRoutes(api fiber.Router, container *di.Container) {
 	api.Get("/media-files/:id/thumbnail", container.MediaFileHandler.GetThumbnail)
+	api.Get("/media-files/:id/editor", container.MediaFileHandler.GetEditor)
+	api.Patch("/media-files/:id/editor", container.MediaFileHandler.UpdateEditor)
+	api.Post("/media-files/:id/finalize", container.MediaFileHandler.Finalize)
 }

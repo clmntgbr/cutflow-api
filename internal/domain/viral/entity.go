@@ -39,4 +39,5 @@ type CandidateWriteRepository interface {
 	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 	ReplaceForMediaFile(ctx context.Context, mediaFileID uuid.UUID, rows []*Candidate) error
 	CountByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) (int64, error)
+	ListByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) ([]*Candidate, error)
 }
