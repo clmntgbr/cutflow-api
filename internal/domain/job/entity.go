@@ -130,4 +130,6 @@ type JobWriteRepository interface {
 	Update(ctx context.Context, job *Job) error
 	GetByID(ctx context.Context, id uuid.UUID) (*Job, error)
 	HasSuccessful(ctx context.Context, mediaFileID uuid.UUID, name string) (bool, error)
+	// FindOpen returns the oldest pending/processing job for mediaFile+name, if any.
+	FindOpen(ctx context.Context, mediaFileID uuid.UUID, name string) (*Job, error)
 }

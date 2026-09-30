@@ -61,3 +61,23 @@ func (r *jobWriteRepository) HasSuccessful(ctx context.Context, mediaFileID uuid
 	}
 	return count > 0, nil
 }
+
+func (r *jobWriteRepository) FindOpen(ctx context.Context, mediaFileID uuid.UUID, name string) (*domainjob.Job, error) {
+	var model JobModel
+	err := DBWithContext(ctx, r.db).
+		Where(
+			"media_file_id = ? AND name = ? AND status IN ?",
+			mediaFileID,
+			name,
+			[]string{domainjob.StatusPending, domainjob.StatusProcessing},
+		).
+		Order("created_at ASC").
+		First(&model).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return jobDomainFromModel(&model), nil
+}

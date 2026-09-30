@@ -494,6 +494,16 @@ func enqueueTimelineRebuild(
 	projectID, mediaFileID, userID uuid.UUID,
 	reason string,
 ) (uuid.UUID, error) {
+	if open, err := jobRepo.FindOpen(ctx, mediaFileID, domainjob.NameRebuildTimeline); err != nil {
+		return uuid.Nil, messaging.Retryable(err)
+	} else if open != nil {
+		log.Printf(
+			"timeline rebuild coalesced mediaFileId=%s existingJobId=%s status=%s reason=%s",
+			mediaFileID, open.ID, open.Status, reason,
+		)
+		return open.ID, nil
+	}
+
 	timelineJob := domainjob.New(projectID, mediaFileID, userID, domainjob.NameRebuildTimeline)
 	if err := jobRepo.Save(ctx, timelineJob); err != nil {
 		return uuid.Nil, messaging.Retryable(err)

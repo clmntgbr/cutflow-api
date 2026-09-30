@@ -71,6 +71,16 @@ func appendTimelineRebuildIfReady(
 		reason = ReasonInitialAnalysisReady
 	}
 
+	if open, err := deps.jobRepo.FindOpen(ctx, mediaFileID, domainjob.NameRebuildTimeline); err != nil {
+		return messaging.Retryable(err)
+	} else if open != nil {
+		log.Printf(
+			"timeline rebuild coalesced mediaFileId=%s existingJobId=%s status=%s reason=%s",
+			mediaFileID, open.ID, open.Status, reason,
+		)
+		return nil
+	}
+
 	timelineJob := domainjob.New(projectID, mediaFileID, userID, domainjob.NameRebuildTimeline)
 	if err := deps.jobRepo.Save(ctx, timelineJob); err != nil {
 		return messaging.Retryable(err)
