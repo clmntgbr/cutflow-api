@@ -66,7 +66,8 @@ func (m *mockUpdateConfigurationHandler) Handle(
 	if m.result != nil {
 		return m.result, nil
 	}
-	if cmd.RebuildTimeline {
+	// Align with app policy: silence / filler / repetition patches enqueue async work.
+	if cmd.Silence != nil || cmd.FillerEnabled != nil || cmd.RepetitionEnabled != nil {
 		return &cmdmediafile.EditorMutationResult{
 			JobID:                   uuid.MustParse("01960000-0000-7000-8000-000000000020"),
 			PreviousTimelineVersion: 4,

@@ -156,9 +156,6 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_Success(t *testing.T)
 	if !update.called || update.cmd.FillerEnabled == nil || *update.cmd.FillerEnabled != false {
 		t.Fatalf("cmd: %#v", update.cmd)
 	}
-	if !update.cmd.RebuildTimeline {
-		t.Fatal("filler/repetition toggle must rebuild timeline")
-	}
 }
 
 func TestMediaFileHandler_UpdateEditor_UpdateSilenceConfiguration_Success(t *testing.T) {
@@ -185,7 +182,7 @@ func TestMediaFileHandler_UpdateEditor_UpdateSilenceConfiguration_Success(t *tes
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
-	if !update.called || !update.cmd.RebuildTimeline {
+	if !update.called {
 		t.Fatalf("cmd: %#v", update.cmd)
 	}
 	if update.cmd.Silence == nil || update.cmd.Silence.MinDurationMs == nil || *update.cmd.Silence.MinDurationMs != 800 {
@@ -198,26 +195,37 @@ func TestMediaFileHandler_UpdateEditor_UpdateSilenceConfiguration_Success(t *tes
 	}
 }
 
-func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_RejectsSilence(t *testing.T) {
+func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_AcceptsSilence(t *testing.T) {
 	update := &mockUpdateConfigurationHandler{}
 	h := newMediaFileHandlerFull(nil, nil, update, nil, nil, nil)
 	app := testutil.NewTestApp()
 	app.Patch("/media-files/:id/editor", testutil.WithUserWithoutProject(testutil.TestUserID), h.UpdateEditor)
+	level := "low"
+	enabled := false
 	req, _ := testutil.JSONRequest(http.MethodPatch, editorPath(), map[string]any{
 		"type": dto.EditorActionUpdateConfiguration,
 		"configuration": map[string]any{
-			"silence": map[string]any{"minDurationMs": 800},
+			"silence": map[string]any{
+				"detectionLevel":  level,
+				"minDurationMs":   1200,
+				"paddingBeforeMs": 240,
+				"paddingAfterMs":  280,
+			},
+			"filler": map[string]any{"enabled": enabled},
 		},
 	})
 	resp, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("perform request: %v", err)
 	}
-	if resp.StatusCode != http.StatusBadRequest {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
-	if update.called {
-		t.Fatal("must not call handler when silence is sent via update_configuration")
+	if !update.called || update.cmd.Silence == nil || update.cmd.Silence.DetectionLevel == nil || *update.cmd.Silence.DetectionLevel != "low" {
+		t.Fatalf("cmd: %#v", update.cmd)
+	}
+	if update.cmd.FillerEnabled == nil || *update.cmd.FillerEnabled != false {
+		t.Fatalf("filler: %#v", update.cmd.FillerEnabled)
 	}
 }
 
@@ -282,9 +290,6 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_WithToggles(t *testin
 	if update.cmd.FillerEnabled == nil || *update.cmd.FillerEnabled != false {
 		t.Fatalf("filler: %#v", update.cmd.FillerEnabled)
 	}
-	if !update.cmd.RebuildTimeline {
-		t.Fatal("expected rebuild")
-	}
 }
 
 func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_SubtitlesOnly_NoRebuild(t *testing.T) {
@@ -306,8 +311,8 @@ func TestMediaFileHandler_UpdateEditor_UpdateConfiguration_SubtitlesOnly_NoRebui
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
-	if update.cmd.RebuildTimeline {
-		t.Fatal("subtitles-only must not rebuild")
+	if update.cmd.Silence != nil || update.cmd.FillerEnabled != nil || update.cmd.RepetitionEnabled != nil {
+		t.Fatalf("unexpected timeline fields: %#v", update.cmd)
 	}
 }
 

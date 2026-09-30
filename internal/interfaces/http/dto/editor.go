@@ -9,6 +9,8 @@ const (
 )
 
 // UpdateEditorRequest is the unified PATCH /editor body (one action per request).
+// configuration may include any subset of silence / filler / repetition / subtitles;
+// the application layer diffs against current values and redetects/rebuilds only when needed.
 type UpdateEditorRequest struct {
 	Type            string                            `json:"type" validate:"required"`
 	TimelineVersion *int                              `json:"timelineVersion"`

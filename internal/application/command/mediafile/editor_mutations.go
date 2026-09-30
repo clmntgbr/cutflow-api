@@ -47,8 +47,6 @@ type UpdateEditorConfigurationCommand struct {
 	RepetitionEnabled *bool
 	SubtitlesEnabled  *bool
 	SubtitleMaxWords  *int
-	// RebuildTimeline enqueues a timeline rebuild (used for silence config changes).
-	RebuildTimeline bool
 }
 
 type SilenceConfigPatch struct {
@@ -118,15 +116,19 @@ func (h *UpdateEditorConfigurationHandler) Handle(
 				return messaging.Retryable(err)
 			}
 		}
+		before := snapshotTimelineRelevantConfig(cfg)
 		needsRedetect := silenceAnalysisParamsChanging(cfg, cmd.Silence)
 		applyConfigurationPatch(cfg, cmd)
 		cfg.UpdatedAt = time.Now().UTC()
 		if err := h.configRepo.Update(txCtx, cfg); err != nil {
 			return messaging.Retryable(err)
 		}
-		if !cmd.RebuildTimeline {
+
+		// Drawer may resend unchanged fields — only enqueue work when timeline inputs moved.
+		if !timelineRelevantConfigChanged(before, cfg) {
 			return nil
 		}
+
 		prevVersion := 0
 		if cmd.TimelineVersion != nil {
 			prevVersion = *cmd.TimelineVersion
@@ -256,6 +258,56 @@ func silenceAnalysisParamsChanging(cfg *domainmediaconfig.MediaConfiguration, pa
 		}
 	}
 	return false
+}
+
+type timelineRelevantConfig struct {
+	SilenceRemovalEnabled  bool
+	SilenceThresholdMode   string
+	SilenceDetectionLevel  string
+	SilenceThresholdDB     *float64
+	SilenceMinDurationMs   int
+	SilencePaddingBeforeMs int
+	SilencePaddingAfterMs  int
+	FillerRemovalEnabled   bool
+	RepetitionRemovalEnabled bool
+}
+
+func snapshotTimelineRelevantConfig(cfg *domainmediaconfig.MediaConfiguration) timelineRelevantConfig {
+	return timelineRelevantConfig{
+		SilenceRemovalEnabled:    cfg.SilenceRemovalEnabled,
+		SilenceThresholdMode:     cfg.SilenceThresholdMode,
+		SilenceDetectionLevel:    cfg.SilenceDetectionLevel,
+		SilenceThresholdDB:       cfg.SilenceThresholdDB,
+		SilenceMinDurationMs:     cfg.SilenceMinDurationMs,
+		SilencePaddingBeforeMs:   cfg.SilencePaddingBeforeMs,
+		SilencePaddingAfterMs:    cfg.SilencePaddingAfterMs,
+		FillerRemovalEnabled:     cfg.FillerRemovalEnabled,
+		RepetitionRemovalEnabled: cfg.RepetitionRemovalEnabled,
+	}
+}
+
+func timelineRelevantConfigChanged(before timelineRelevantConfig, cfg *domainmediaconfig.MediaConfiguration) bool {
+	if before.SilenceRemovalEnabled != cfg.SilenceRemovalEnabled ||
+		before.SilenceThresholdMode != cfg.SilenceThresholdMode ||
+		before.SilenceDetectionLevel != cfg.SilenceDetectionLevel ||
+		before.SilenceMinDurationMs != cfg.SilenceMinDurationMs ||
+		before.SilencePaddingBeforeMs != cfg.SilencePaddingBeforeMs ||
+		before.SilencePaddingAfterMs != cfg.SilencePaddingAfterMs ||
+		before.FillerRemovalEnabled != cfg.FillerRemovalEnabled ||
+		before.RepetitionRemovalEnabled != cfg.RepetitionRemovalEnabled {
+		return true
+	}
+	return !float64PtrEqual(before.SilenceThresholdDB, cfg.SilenceThresholdDB)
+}
+
+func float64PtrEqual(a, b *float64) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 func configurationRebuildReason(cmd UpdateEditorConfigurationCommand) string {

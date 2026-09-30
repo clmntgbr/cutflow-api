@@ -151,10 +151,8 @@ func (h *MediaFileHandler) UpdateEditor(c fiber.Ctx) error {
 	}
 
 	switch req.Type {
-	case dto.EditorActionUpdateConfiguration:
+	case dto.EditorActionUpdateConfiguration, dto.EditorActionUpdateSilenceConfiguration:
 		return h.updateConfiguration(c, mediaFileID, user.ID, req)
-	case dto.EditorActionUpdateSilenceConfiguration:
-		return h.updateSilenceConfiguration(c, mediaFileID, user.ID, req)
 	case dto.EditorActionOverrideDecision:
 		return h.overrideDecision(c, mediaFileID, user.ID, req)
 	case dto.EditorActionClearDecisionOverride:
@@ -217,59 +215,23 @@ func (h *MediaFileHandler) updateConfiguration(
 	if req.Configuration == nil {
 		return h.editorValidationError(c, fiber.Map{"configuration": "is required"})
 	}
-	if req.Configuration.Silence != nil {
-		return h.editorValidationError(c, fiber.Map{
-			"configuration.silence": "use update_silence_configuration",
-		})
-	}
-	cmd := cmdmediafile.UpdateEditorConfigurationCommand{
-		MediaFileID:     mediaFileID,
-		UserID:          userID,
-		TimelineVersion: req.TimelineVersion,
-	}
 	cfg := req.Configuration
-	rebuild := false
-	if cfg.Filler != nil {
-		cmd.FillerEnabled = cfg.Filler.Enabled
-		rebuild = true
-	}
-	if cfg.Repetition != nil {
-		cmd.RepetitionEnabled = cfg.Repetition.Enabled
-		rebuild = true
-	}
-	if cfg.Subtitles != nil {
-		cmd.SubtitlesEnabled = cfg.Subtitles.Enabled
-		cmd.SubtitleMaxWords = cfg.Subtitles.MaxWords
-	}
-	cmd.RebuildTimeline = rebuild
-
-	result, err := h.updateConfigurationHandler.Handle(c.Context(), cmd)
-	if err != nil {
-		return h.mapEditorMutationError(c, err)
-	}
-	if rebuild && result != nil {
-		return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
-			result.JobID.String(),
-			result.PreviousTimelineVersion,
-		))
-	}
-	return c.SendStatus(fiber.StatusNoContent)
-}
-
-func (h *MediaFileHandler) updateSilenceConfiguration(
-	c fiber.Ctx,
-	mediaFileID, userID uuid.UUID,
-	req dto.UpdateEditorRequest,
-) error {
-	if req.Configuration == nil || req.Configuration.Silence == nil {
+	// update_silence_configuration keeps requiring silence for backward-compatible clients.
+	if req.Type == dto.EditorActionUpdateSilenceConfiguration && cfg.Silence == nil {
 		return h.editorValidationError(c, fiber.Map{"configuration.silence": "is required"})
 	}
-	s := req.Configuration.Silence
+	if cfg.Silence == nil && cfg.Filler == nil && cfg.Repetition == nil && cfg.Subtitles == nil {
+		return h.editorValidationError(c, fiber.Map{"configuration": "at least one section is required"})
+	}
+
 	cmd := cmdmediafile.UpdateEditorConfigurationCommand{
 		MediaFileID:     mediaFileID,
 		UserID:          userID,
 		TimelineVersion: req.TimelineVersion,
-		Silence: &cmdmediafile.SilenceConfigPatch{
+	}
+	if cfg.Silence != nil {
+		s := cfg.Silence
+		cmd.Silence = &cmdmediafile.SilenceConfigPatch{
 			Enabled:         s.Enabled,
 			ThresholdMode:   s.ThresholdMode,
 			DetectionLevel:  s.DetectionLevel,
@@ -277,18 +239,30 @@ func (h *MediaFileHandler) updateSilenceConfiguration(
 			PaddingBeforeMs: s.PaddingBeforeMs,
 			PaddingAfterMs:  s.PaddingAfterMs,
 			ThresholdDB:     s.ThresholdDB,
-		},
-		RebuildTimeline: true,
+		}
+	}
+	if cfg.Filler != nil {
+		cmd.FillerEnabled = cfg.Filler.Enabled
+	}
+	if cfg.Repetition != nil {
+		cmd.RepetitionEnabled = cfg.Repetition.Enabled
+	}
+	if cfg.Subtitles != nil {
+		cmd.SubtitlesEnabled = cfg.Subtitles.Enabled
+		cmd.SubtitleMaxWords = cfg.Subtitles.MaxWords
 	}
 
 	result, err := h.updateConfigurationHandler.Handle(c.Context(), cmd)
 	if err != nil {
 		return h.mapEditorMutationError(c, err)
 	}
-	return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
-		result.JobID.String(),
-		result.PreviousTimelineVersion,
-	))
+	if result != nil && result.JobID != uuid.Nil {
+		return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
+			result.JobID.String(),
+			result.PreviousTimelineVersion,
+		))
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }
 
 func (h *MediaFileHandler) overrideDecision(
