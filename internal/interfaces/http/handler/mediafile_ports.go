@@ -22,9 +22,9 @@ type mediaFileUpdateConfigurationHandler interface {
 }
 
 type mediaFileDecisionMutationHandler interface {
-	Override(ctx context.Context, cmd cmdmediafile.OverrideDecisionCommand) error
-	ClearOverride(ctx context.Context, cmd cmdmediafile.ClearDecisionOverrideCommand) error
-	CreateManual(ctx context.Context, cmd cmdmediafile.CreateManualDecisionCommand) error
+	Override(ctx context.Context, cmd cmdmediafile.OverrideDecisionCommand) (*cmdmediafile.EditorMutationResult, error)
+	ClearOverride(ctx context.Context, cmd cmdmediafile.ClearDecisionOverrideCommand) (*cmdmediafile.EditorMutationResult, error)
+	CreateManual(ctx context.Context, cmd cmdmediafile.CreateManualDecisionCommand) (*cmdmediafile.EditorMutationResult, error)
 }
 
 type mediaFileFinalizeHandler interface {

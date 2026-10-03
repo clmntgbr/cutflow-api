@@ -107,6 +107,8 @@ func NewContainer(db *gorm.DB, env *config.Config) *Container {
 		write.NewDetectedTranscriptIssueWriteRepository(db),
 		write.NewUserOverrideRepository(db),
 		write.NewTimelineWriteRepository(db),
+		write.NewJobWriteRepository(db),
+		outboxRepo,
 	)
 	finalizeEditorHandler := cmdmediafile.NewFinalizeEditorHandler(
 		mediaFileWriteRepo,

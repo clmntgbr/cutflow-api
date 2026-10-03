@@ -285,16 +285,20 @@ func (h *MediaFileHandler) overrideDecision(
 		return h.editorValidationError(c, fiber.Map{"decisionId": "must be a valid UUID"})
 	}
 
-	if err := h.decisionMutationHandler.Override(c.Context(), cmdmediafile.OverrideDecisionCommand{
+	result, err := h.decisionMutationHandler.Override(c.Context(), cmdmediafile.OverrideDecisionCommand{
 		MediaFileID:     mediaFileID,
 		UserID:          userID,
 		DecisionID:      decisionID,
 		Action:          *req.Action,
 		TimelineVersion: req.TimelineVersion,
-	}); err != nil {
+	})
+	if err != nil {
 		return h.mapEditorMutationError(c, err)
 	}
-	return c.SendStatus(fiber.StatusNoContent)
+	return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
+		result.JobID.String(),
+		result.PreviousTimelineVersion,
+	))
 }
 
 func (h *MediaFileHandler) clearDecisionOverride(
@@ -310,15 +314,19 @@ func (h *MediaFileHandler) clearDecisionOverride(
 		return h.editorValidationError(c, fiber.Map{"decisionId": "must be a valid UUID"})
 	}
 
-	if err := h.decisionMutationHandler.ClearOverride(c.Context(), cmdmediafile.ClearDecisionOverrideCommand{
+	result, err := h.decisionMutationHandler.ClearOverride(c.Context(), cmdmediafile.ClearDecisionOverrideCommand{
 		MediaFileID:     mediaFileID,
 		UserID:          userID,
 		DecisionID:      decisionID,
 		TimelineVersion: req.TimelineVersion,
-	}); err != nil {
+	})
+	if err != nil {
 		return h.mapEditorMutationError(c, err)
 	}
-	return c.SendStatus(fiber.StatusNoContent)
+	return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
+		result.JobID.String(),
+		result.PreviousTimelineVersion,
+	))
 }
 
 func (h *MediaFileHandler) createManualCut(
@@ -345,17 +353,21 @@ func (h *MediaFileHandler) createManualCut(
 		return h.editorValidationError(c, fieldErrors)
 	}
 
-	if err := h.decisionMutationHandler.CreateManual(c.Context(), cmdmediafile.CreateManualDecisionCommand{
+	result, err := h.decisionMutationHandler.CreateManual(c.Context(), cmdmediafile.CreateManualDecisionCommand{
 		MediaFileID:     mediaFileID,
 		UserID:          userID,
 		Action:          domaintimeline.ActionRemove,
 		SourceStartMs:   *req.SourceStartMs,
 		SourceEndMs:     *req.SourceEndMs,
 		TimelineVersion: req.TimelineVersion,
-	}); err != nil {
+	})
+	if err != nil {
 		return h.mapEditorMutationError(c, err)
 	}
-	return c.SendStatus(fiber.StatusNoContent)
+	return c.Status(fiber.StatusAccepted).JSON(presenter.NewEditorRebuildAcceptedResponse(
+		result.JobID.String(),
+		result.PreviousTimelineVersion,
+	))
 }
 
 func (h *MediaFileHandler) editorValidationError(c fiber.Ctx, fieldErrors fiber.Map) error {

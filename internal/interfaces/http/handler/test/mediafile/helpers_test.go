@@ -83,34 +83,58 @@ type mockDecisionMutationHandler struct {
 	overrideCmd    cmdmediafile.OverrideDecisionCommand
 	clearCmd       cmdmediafile.ClearDecisionOverrideCommand
 	createCmd      cmdmediafile.CreateManualDecisionCommand
+	result         *cmdmediafile.EditorMutationResult
 	err            error
+}
+
+func (m *mockDecisionMutationHandler) defaultResult(timelineVersion *int) *cmdmediafile.EditorMutationResult {
+	if m.result != nil {
+		return m.result
+	}
+	prev := 4
+	if timelineVersion != nil {
+		prev = *timelineVersion
+	}
+	return &cmdmediafile.EditorMutationResult{
+		JobID:                   uuid.MustParse("01960000-0000-7000-8000-000000000020"),
+		PreviousTimelineVersion: prev,
+	}
 }
 
 func (m *mockDecisionMutationHandler) Override(
 	_ context.Context,
 	cmd cmdmediafile.OverrideDecisionCommand,
-) error {
+) (*cmdmediafile.EditorMutationResult, error) {
 	m.overrideCalled = true
 	m.overrideCmd = cmd
-	return m.err
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.defaultResult(cmd.TimelineVersion), nil
 }
 
 func (m *mockDecisionMutationHandler) ClearOverride(
 	_ context.Context,
 	cmd cmdmediafile.ClearDecisionOverrideCommand,
-) error {
+) (*cmdmediafile.EditorMutationResult, error) {
 	m.clearCalled = true
 	m.clearCmd = cmd
-	return m.err
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.defaultResult(cmd.TimelineVersion), nil
 }
 
 func (m *mockDecisionMutationHandler) CreateManual(
 	_ context.Context,
 	cmd cmdmediafile.CreateManualDecisionCommand,
-) error {
+) (*cmdmediafile.EditorMutationResult, error) {
 	m.createCalled = true
 	m.createCmd = cmd
-	return m.err
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.defaultResult(cmd.TimelineVersion), nil
 }
 
 type mockFinalizeHandler struct {

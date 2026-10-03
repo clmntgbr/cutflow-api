@@ -348,6 +348,8 @@ type DecisionMutationHandler struct {
 	issueRepo    domaintranscriptissue.IssueWriteRepository
 	overrideRepo OverrideStore
 	timelineRepo ActiveTimelineVersionFinder
+	jobRepo      domainjob.JobWriteRepository
+	outbox       port.OutboxRepository
 }
 
 func NewDecisionMutationHandler(
@@ -357,6 +359,8 @@ func NewDecisionMutationHandler(
 	issueRepo domaintranscriptissue.IssueWriteRepository,
 	overrideRepo OverrideStore,
 	timelineRepo ActiveTimelineVersionFinder,
+	jobRepo domainjob.JobWriteRepository,
+	outbox port.OutboxRepository,
 ) *DecisionMutationHandler {
 	return &DecisionMutationHandler{
 		mediaRepo:    mediaRepo,
@@ -365,23 +369,26 @@ func NewDecisionMutationHandler(
 		issueRepo:    issueRepo,
 		overrideRepo: overrideRepo,
 		timelineRepo: timelineRepo,
+		jobRepo:      jobRepo,
+		outbox:       outbox,
 	}
 }
 
-func (h *DecisionMutationHandler) Override(ctx context.Context, cmd OverrideDecisionCommand) error {
+func (h *DecisionMutationHandler) Override(ctx context.Context, cmd OverrideDecisionCommand) (*EditorMutationResult, error) {
 	media, err := h.requireOwnedMedia(ctx, cmd.MediaFileID, cmd.UserID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := assertTimelineVersion(ctx, h.timelineRepo, cmd.MediaFileID, cmd.TimelineVersion); err != nil {
-		return err
+		return nil, err
 	}
 	decision, err := h.findEditorDecision(ctx, media, cmd.DecisionID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+	var result *EditorMutationResult
+	err = h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
 		_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep)
 		_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove)
 		if err := h.overrideRepo.Save(txCtx, domaintimeline.Override{
@@ -394,50 +401,70 @@ func (h *DecisionMutationHandler) Override(ctx context.Context, cmd OverrideDeci
 		}); err != nil {
 			return messaging.Retryable(err)
 		}
+		res, err := h.enqueueDecisionRebuild(txCtx, media, cmd.TimelineVersion, "decision_override")
+		if err != nil {
+			return err
+		}
+		result = res
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-func (h *DecisionMutationHandler) ClearOverride(ctx context.Context, cmd ClearDecisionOverrideCommand) error {
+func (h *DecisionMutationHandler) ClearOverride(ctx context.Context, cmd ClearDecisionOverrideCommand) (*EditorMutationResult, error) {
 	media, err := h.requireOwnedMedia(ctx, cmd.MediaFileID, cmd.UserID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := assertTimelineVersion(ctx, h.timelineRepo, cmd.MediaFileID, cmd.TimelineVersion); err != nil {
-		return err
+		return nil, err
 	}
 	decision, err := h.findEditorDecision(ctx, media, cmd.DecisionID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+	var result *EditorMutationResult
+	err = h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep); err != nil {
 			return messaging.Retryable(err)
 		}
 		if err := h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove); err != nil {
 			return messaging.Retryable(err)
 		}
+		res, err := h.enqueueDecisionRebuild(txCtx, media, cmd.TimelineVersion, "decision_override_cleared")
+		if err != nil {
+			return err
+		}
+		result = res
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-func (h *DecisionMutationHandler) CreateManual(ctx context.Context, cmd CreateManualDecisionCommand) error {
+func (h *DecisionMutationHandler) CreateManual(ctx context.Context, cmd CreateManualDecisionCommand) (*EditorMutationResult, error) {
 	media, err := h.requireOwnedMedia(ctx, cmd.MediaFileID, cmd.UserID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := assertTimelineVersion(ctx, h.timelineRepo, cmd.MediaFileID, cmd.TimelineVersion); err != nil {
-		return err
+		return nil, err
 	}
 	if cmd.SourceStartMs < 0 || cmd.SourceEndMs <= cmd.SourceStartMs {
-		return messaging.NonRetryable(ErrInvalidManualRange)
+		return nil, messaging.NonRetryable(ErrInvalidManualRange)
 	}
 	if media.DurationMs > 0 && cmd.SourceEndMs > media.DurationMs {
-		return messaging.NonRetryable(ErrInvalidManualRange)
+		return nil, messaging.NonRetryable(ErrInvalidManualRange)
 	}
 
-	return h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
+	var result *EditorMutationResult
+	err = h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
 		if err := h.overrideRepo.Save(txCtx, domaintimeline.Override{
 			ID:            uuid.New(),
 			MediaFileID:   media.ID,
@@ -448,8 +475,50 @@ func (h *DecisionMutationHandler) CreateManual(ctx context.Context, cmd CreateMa
 		}); err != nil {
 			return messaging.Retryable(err)
 		}
+		res, err := h.enqueueDecisionRebuild(txCtx, media, cmd.TimelineVersion, "manual_cut")
+		if err != nil {
+			return err
+		}
+		result = res
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (h *DecisionMutationHandler) enqueueDecisionRebuild(
+	ctx context.Context,
+	media *domainmediafile.MediaFile,
+	timelineVersion *int,
+	reason string,
+) (*EditorMutationResult, error) {
+	prevVersion := 0
+	if timelineVersion != nil {
+		prevVersion = *timelineVersion
+	} else {
+		tl, err := h.timelineRepo.GetActiveByMediaFileID(ctx, media.ID)
+		if err != nil {
+			return nil, messaging.Retryable(err)
+		}
+		if tl != nil {
+			prevVersion = tl.Version
+		}
+	}
+	jobID, err := enqueueTimelineRebuild(
+		ctx,
+		h.jobRepo,
+		h.outbox,
+		media.ProjectID,
+		media.ID,
+		media.UserID,
+		reason,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &EditorMutationResult{JobID: jobID, PreviousTimelineVersion: prevVersion}, nil
 }
 
 func (h *DecisionMutationHandler) requireOwnedMedia(

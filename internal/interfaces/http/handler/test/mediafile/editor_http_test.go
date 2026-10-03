@@ -335,11 +335,16 @@ func TestMediaFileHandler_UpdateEditor_OverrideDecision_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("perform request: %v", err)
 	}
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 	if !decisions.overrideCalled || decisions.overrideCmd.Action != "keep" {
 		t.Fatalf("override: %#v", decisions.overrideCmd)
+	}
+	var out presenter.EditorRebuildAcceptedResponse
+	testutil.DecodeJSON(t, resp, &out)
+	if out.Status != "accepted" || out.JobID == "" || out.PreviousTimelineVersion != 4 {
+		t.Fatalf("response: %#v", out)
 	}
 }
 
@@ -361,11 +366,16 @@ func TestMediaFileHandler_UpdateEditor_ClearDecisionOverride_Success(t *testing.
 	if err != nil {
 		t.Fatalf("perform request: %v", err)
 	}
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 	if !decisions.clearCalled {
 		t.Fatal("expected clear call")
+	}
+	var out presenter.EditorRebuildAcceptedResponse
+	testutil.DecodeJSON(t, resp, &out)
+	if out.Status != "accepted" || out.JobID == "" || out.PreviousTimelineVersion != 5 {
+		t.Fatalf("response: %#v", out)
 	}
 }
 
@@ -387,11 +397,16 @@ func TestMediaFileHandler_UpdateEditor_CreateManualCut_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("perform request: %v", err)
 	}
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 	if !decisions.createCalled || decisions.createCmd.Action != "remove" {
 		t.Fatalf("create: %#v", decisions.createCmd)
+	}
+	var out presenter.EditorRebuildAcceptedResponse
+	testutil.DecodeJSON(t, resp, &out)
+	if out.Status != "accepted" || out.JobID == "" || out.PreviousTimelineVersion != 5 {
+		t.Fatalf("response: %#v", out)
 	}
 }
 
