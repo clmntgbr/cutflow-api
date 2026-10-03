@@ -225,20 +225,28 @@ func (h *RebuildTimelineHandler) persist(ctx context.Context, cmd RebuildTimelin
 }
 
 func (h *RebuildTimelineHandler) reuseInTx(ctx context.Context, cmd RebuildTimelineCommand, tl *domaintimeline.Timeline) error {
-	alreadyActive := tl.IsActive
-	if !alreadyActive {
+	if !tl.IsActive {
 		if err := h.timelineRepo.DeactivateOthers(ctx, cmd.MediaFileID, tl.ID); err != nil {
 			return messaging.Retryable(err)
 		}
 		if err := h.timelineRepo.Activate(ctx, tl.ID); err != nil {
 			return messaging.Retryable(err)
 		}
+	} else {
+		fp := tl.Fingerprint
+		if len(fp) > 12 {
+			fp = fp[:12]
+		}
+		log.Printf(
+			"timeline rebuild reuse-active mediaFileId=%s version=%d fingerprint=%s reason=%s",
+			cmd.MediaFileID, tl.Version, fp, cmd.Reason,
+		)
 	}
 
-	events := make([]event.DomainEvent, 0, 3)
-	// Same fingerprint already active → no client-visible change; skip duplicate timeline_updated.
-	if !alreadyActive {
-		events = append(events, domaintimeline.Updated{
+	// Always publish timeline_updated so the editor can unblock (override/clear/config),
+	// even when the fingerprint is unchanged.
+	events := []event.DomainEvent{
+		domaintimeline.Updated{
 			ID:          uuid.New().String(),
 			TimelineID:  tl.ID.String(),
 			MediaFileID: cmd.MediaFileID.String(),
@@ -248,25 +256,13 @@ func (h *RebuildTimelineHandler) reuseInTx(ctx context.Context, cmd RebuildTimel
 			DurationMs:  tl.DurationMs,
 			Fingerprint: tl.Fingerprint,
 			Timestamp:   time.Now().UTC(),
-		})
-	} else {
-		fp := tl.Fingerprint
-		if len(fp) > 12 {
-			fp = fp[:12]
-		}
-		log.Printf(
-			"timeline rebuild noop mediaFileId=%s version=%d fingerprint=%s reason=%s",
-			cmd.MediaFileID, tl.Version, fp, cmd.Reason,
-		)
+		},
 	}
 	if err := h.markProjectReadyInTx(ctx, cmd.ProjectID, &events); err != nil {
 		return err
 	}
 	if err := h.succeedJobInTx(ctx, cmd.JobID, &events); err != nil {
 		return err
-	}
-	if len(events) == 0 {
-		return nil
 	}
 	return h.outbox.StoreEvents(ctx, events)
 }
