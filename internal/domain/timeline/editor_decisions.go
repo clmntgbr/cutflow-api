@@ -34,7 +34,7 @@ func ResolveEditorDecisions(auto []Decision, overrides []Override, labels map[De
 		autoAction := ActionRemove
 		effective := ActionRemove
 		modified := false
-		if hasKeepOverride(overrides, d.SourceStartMs, d.SourceEndMs) {
+		if hasKeepOverride(overrides, typ, d.SourceStartMs, d.SourceEndMs) {
 			effective = ActionKeep
 			modified = true
 		}
@@ -127,12 +127,18 @@ func normalizeEditorType(t string) string {
 	}
 }
 
-func hasKeepOverride(overrides []Override, start, end int64) bool {
+func hasKeepOverride(overrides []Override, decisionType string, start, end int64) bool {
+	decisionType = normalizeEditorType(decisionType)
 	for _, o := range overrides {
 		if o.Action != ActionKeep {
 			continue
 		}
-		if rangesOverlap(start, end, o.SourceStartMs, o.SourceEndMs) {
+		if !rangesOverlap(start, end, o.SourceStartMs, o.SourceEndMs) {
+			continue
+		}
+		scope := normalizeEditorType(o.Type)
+		// Legacy manual keeps applied to every decision type on that range.
+		if scope == "" || scope == DecisionManual || scope == decisionType {
 			return true
 		}
 	}

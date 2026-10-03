@@ -42,7 +42,7 @@ func TestResolveEditorDecisions_KeepOverride(t *testing.T) {
 	}}
 	overrides := []Override{{
 		MediaFileID:   mediaID,
-		Type:          DecisionManual,
+		Type:          DecisionFiller,
 		SourceStartMs: 1000,
 		SourceEndMs:   2000,
 		Action:        ActionKeep,
@@ -58,6 +58,47 @@ func TestResolveEditorDecisions_KeepOverride(t *testing.T) {
 	}
 	if got[0].Label == nil || *got[0].Label != "euh" {
 		t.Fatalf("label: %#v", got[0].Label)
+	}
+}
+
+func TestResolveEditorDecisions_SilenceKeepDoesNotMarkOverlappingFiller(t *testing.T) {
+	mediaID := uuid.New()
+	auto := []Decision{
+		{
+			MediaFileID:   mediaID,
+			Type:          DecisionSilence,
+			SourceStartMs: 1000,
+			SourceEndMs:   3000,
+			Action:        ActionRemove,
+		},
+		{
+			MediaFileID:   mediaID,
+			Type:          DecisionFiller,
+			SourceStartMs: 1500,
+			SourceEndMs:   1800,
+			Action:        ActionRemove,
+		},
+	}
+	overrides := []Override{{
+		MediaFileID:   mediaID,
+		Type:          DecisionSilence,
+		SourceStartMs: 1000,
+		SourceEndMs:   3000,
+		Action:        ActionKeep,
+	}}
+	got := ResolveEditorDecisions(auto, overrides, nil)
+	if len(got) != 2 {
+		t.Fatalf("len: got %d", len(got))
+	}
+	byType := map[string]EditorDecision{}
+	for _, d := range got {
+		byType[d.Type] = d
+	}
+	if byType[DecisionSilence].EffectiveAction != ActionKeep || !byType[DecisionSilence].ModifiedByUser {
+		t.Fatalf("silence: %#v", byType[DecisionSilence])
+	}
+	if byType[DecisionFiller].EffectiveAction != ActionRemove || byType[DecisionFiller].ModifiedByUser {
+		t.Fatalf("filler should stay automatic remove: %#v", byType[DecisionFiller])
 	}
 }
 

@@ -30,7 +30,7 @@ var (
 type OverrideStore interface {
 	ListByMediaFileID(ctx context.Context, mediaFileID uuid.UUID) ([]domaintimeline.Override, error)
 	Save(ctx context.Context, o domaintimeline.Override) error
-	DeleteMatching(ctx context.Context, mediaFileID uuid.UUID, startMs, endMs int64, action string) error
+	DeleteMatching(ctx context.Context, mediaFileID uuid.UUID, startMs, endMs int64, action, overrideType string) error
 	WithTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
@@ -379,7 +379,8 @@ func (h *DecisionMutationHandler) Override(ctx context.Context, cmd OverrideDeci
 	if err != nil {
 		return nil, err
 	}
-	if err := assertTimelineVersion(ctx, h.timelineRepo, cmd.MediaFileID, cmd.TimelineVersion); err != nil {
+	// Decision IDs are stable across rebuilds — allow chained keeps without STALE_TIMELINE.
+	if err := requireActiveTimeline(ctx, h.timelineRepo, cmd.MediaFileID); err != nil {
 		return nil, err
 	}
 	decision, err := h.findEditorDecision(ctx, media, cmd.DecisionID)
@@ -389,19 +390,28 @@ func (h *DecisionMutationHandler) Override(ctx context.Context, cmd OverrideDeci
 
 	var result *EditorMutationResult
 	err = h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
-		_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep)
-		_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove)
+		decisionType := decision.Type
+		if decisionType == "" {
+			decisionType = domaintimeline.DecisionManual
+		}
+		_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep, decisionType)
+		_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove, decisionType)
+		// Clean legacy untyped/manual overrides on the same range.
+		if decisionType != domaintimeline.DecisionManual {
+			_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep, domaintimeline.DecisionManual)
+			_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove, domaintimeline.DecisionManual)
+		}
 		if err := h.overrideRepo.Save(txCtx, domaintimeline.Override{
 			ID:            uuid.New(),
 			MediaFileID:   media.ID,
-			Type:          domaintimeline.DecisionManual,
+			Type:          decisionType,
 			SourceStartMs: decision.SourceStartMs,
 			SourceEndMs:   decision.SourceEndMs,
 			Action:        cmd.Action,
 		}); err != nil {
 			return messaging.Retryable(err)
 		}
-		res, err := h.enqueueDecisionRebuild(txCtx, media, cmd.TimelineVersion, "decision_override")
+		res, err := h.enqueueDecisionRebuild(txCtx, media, "decision_override")
 		if err != nil {
 			return err
 		}
@@ -419,7 +429,7 @@ func (h *DecisionMutationHandler) ClearOverride(ctx context.Context, cmd ClearDe
 	if err != nil {
 		return nil, err
 	}
-	if err := assertTimelineVersion(ctx, h.timelineRepo, cmd.MediaFileID, cmd.TimelineVersion); err != nil {
+	if err := requireActiveTimeline(ctx, h.timelineRepo, cmd.MediaFileID); err != nil {
 		return nil, err
 	}
 	decision, err := h.findEditorDecision(ctx, media, cmd.DecisionID)
@@ -429,13 +439,21 @@ func (h *DecisionMutationHandler) ClearOverride(ctx context.Context, cmd ClearDe
 
 	var result *EditorMutationResult
 	err = h.overrideRepo.WithTransaction(ctx, func(txCtx context.Context) error {
-		if err := h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep); err != nil {
+		decisionType := decision.Type
+		if decisionType == "" {
+			decisionType = domaintimeline.DecisionManual
+		}
+		if err := h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep, decisionType); err != nil {
 			return messaging.Retryable(err)
 		}
-		if err := h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove); err != nil {
+		if err := h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove, decisionType); err != nil {
 			return messaging.Retryable(err)
 		}
-		res, err := h.enqueueDecisionRebuild(txCtx, media, cmd.TimelineVersion, "decision_override_cleared")
+		if decisionType != domaintimeline.DecisionManual {
+			_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionKeep, domaintimeline.DecisionManual)
+			_ = h.overrideRepo.DeleteMatching(txCtx, media.ID, decision.SourceStartMs, decision.SourceEndMs, domaintimeline.ActionRemove, domaintimeline.DecisionManual)
+		}
+		res, err := h.enqueueDecisionRebuild(txCtx, media, "decision_override_cleared")
 		if err != nil {
 			return err
 		}
@@ -453,7 +471,7 @@ func (h *DecisionMutationHandler) CreateManual(ctx context.Context, cmd CreateMa
 	if err != nil {
 		return nil, err
 	}
-	if err := assertTimelineVersion(ctx, h.timelineRepo, cmd.MediaFileID, cmd.TimelineVersion); err != nil {
+	if err := requireActiveTimeline(ctx, h.timelineRepo, cmd.MediaFileID); err != nil {
 		return nil, err
 	}
 	if cmd.SourceStartMs < 0 || cmd.SourceEndMs <= cmd.SourceStartMs {
@@ -475,7 +493,7 @@ func (h *DecisionMutationHandler) CreateManual(ctx context.Context, cmd CreateMa
 		}); err != nil {
 			return messaging.Retryable(err)
 		}
-		res, err := h.enqueueDecisionRebuild(txCtx, media, cmd.TimelineVersion, "manual_cut")
+		res, err := h.enqueueDecisionRebuild(txCtx, media, "manual_cut")
 		if err != nil {
 			return err
 		}
@@ -491,20 +509,15 @@ func (h *DecisionMutationHandler) CreateManual(ctx context.Context, cmd CreateMa
 func (h *DecisionMutationHandler) enqueueDecisionRebuild(
 	ctx context.Context,
 	media *domainmediafile.MediaFile,
-	timelineVersion *int,
 	reason string,
 ) (*EditorMutationResult, error) {
 	prevVersion := 0
-	if timelineVersion != nil {
-		prevVersion = *timelineVersion
-	} else {
-		tl, err := h.timelineRepo.GetActiveByMediaFileID(ctx, media.ID)
-		if err != nil {
-			return nil, messaging.Retryable(err)
-		}
-		if tl != nil {
-			prevVersion = tl.Version
-		}
+	tl, err := h.timelineRepo.GetActiveByMediaFileID(ctx, media.ID)
+	if err != nil {
+		return nil, messaging.Retryable(err)
+	}
+	if tl != nil {
+		prevVersion = tl.Version
 	}
 	jobID, err := enqueueTimelineRebuild(
 		ctx,
@@ -580,6 +593,21 @@ func (h *DecisionMutationHandler) findEditorDecision(
 		}
 	}
 	return domaintimeline.EditorDecision{}, messaging.NonRetryable(ErrDecisionNotFound)
+}
+
+func requireActiveTimeline(
+	ctx context.Context,
+	timelineRepo ActiveTimelineVersionFinder,
+	mediaFileID uuid.UUID,
+) error {
+	tl, err := timelineRepo.GetActiveByMediaFileID(ctx, mediaFileID)
+	if err != nil {
+		return messaging.Retryable(err)
+	}
+	if tl == nil {
+		return messaging.NonRetryable(querymediafile.ErrEditorNotReady)
+	}
+	return nil
 }
 
 func assertTimelineVersion(

@@ -105,41 +105,62 @@ func applyOverrides(auto []Decision, overrides []Override) []Decision {
 		return auto
 	}
 
-	ranges := make([]Range, 0, len(auto))
+	// Keep overrides are type-scoped so keeping a silence does not cancel an
+	// overlapping filler/repetition. Manual (legacy) keeps still apply to all types.
+	byType := make(map[string][]Range)
+	mediaID := uuid.Nil
 	for _, d := range auto {
 		if d.Action != ActionRemove {
 			continue
 		}
-		ranges = append(ranges, Range{
+		if mediaID == uuid.Nil {
+			mediaID = d.MediaFileID
+		}
+		typ := normalizeEditorType(d.Type)
+		byType[typ] = append(byType[typ], Range{
 			StartMs: d.SourceStartMs,
 			EndMs:   d.SourceEndMs,
-			Reasons: append([]string(nil), d.Reasons...),
+			Reasons: []string{typ},
 		})
 	}
-	ranges = NormalizeRanges(ranges)
+	for typ, ranges := range byType {
+		byType[typ] = NormalizeRanges(ranges)
+	}
 
+	var manualRemoves []Range
 	for _, o := range overrides {
+		keep := Range{StartMs: o.SourceStartMs, EndMs: o.SourceEndMs}
 		switch o.Action {
 		case ActionKeep:
-			ranges = subtractRange(ranges, Range{StartMs: o.SourceStartMs, EndMs: o.SourceEndMs})
+			scope := normalizeEditorType(o.Type)
+			if scope == "" || scope == DecisionManual {
+				for typ, ranges := range byType {
+					byType[typ] = subtractRange(ranges, keep)
+				}
+				continue
+			}
+			byType[scope] = subtractRange(byType[scope], keep)
 		case ActionRemove:
-			ranges = NormalizeRanges(append(ranges, Range{
+			manualRemoves = append(manualRemoves, Range{
 				StartMs: o.SourceStartMs,
 				EndMs:   o.SourceEndMs,
 				Reasons: []string{DecisionManual},
-			}))
+			})
 		}
 	}
+
+	ranges := make([]Range, 0)
+	for _, typed := range byType {
+		ranges = append(ranges, typed...)
+	}
+	ranges = append(ranges, manualRemoves...)
+	ranges = NormalizeRanges(ranges)
 
 	out := make([]Decision, 0, len(ranges))
 	for _, r := range ranges {
 		typ := DecisionManual
 		if len(r.Reasons) > 0 {
 			typ = r.Reasons[0]
-		}
-		mediaID := uuid.Nil
-		if len(auto) > 0 {
-			mediaID = auto[0].MediaFileID
 		}
 		out = append(out, Decision{
 			MediaFileID:   mediaID,

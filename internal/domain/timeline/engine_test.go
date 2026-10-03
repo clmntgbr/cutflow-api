@@ -88,11 +88,37 @@ func TestBuildDecisions_SilencePaddingAndOverrideKeep(t *testing.T) {
 			{StartMs: 10000, EndMs: 12000},
 		},
 		Overrides: []Override{
-			{MediaFileID: mediaID, Action: ActionKeep, SourceStartMs: 10150, SourceEndMs: 11950},
+			{MediaFileID: mediaID, Type: DecisionSilence, Action: ActionKeep, SourceStartMs: 10150, SourceEndMs: 11950},
 		},
 	})
 	if len(decisions) != 0 {
 		t.Fatalf("expected keep override to cancel silence, got %+v", decisions)
+	}
+}
+
+func TestBuildDecisions_SilenceKeepDoesNotCancelOverlappingFiller(t *testing.T) {
+	mediaID := uuid.New()
+	conf := 0.9
+	decisions := BuildDecisions(BuildInput{
+		MediaFileID:          mediaID,
+		MediaDurationMs:      60000,
+		SilenceRemoval:       true,
+		FillerRemoval:        true,
+		SilenceMinDurationMs: 500,
+		SilencePadBeforeMs:   0,
+		SilencePadAfterMs:    0,
+		Silences: []domainsilence.Interval{
+			{StartMs: 10000, EndMs: 12000},
+		},
+		Issues: []*domaintranscriptissue.Issue{
+			{Type: domaintranscriptissue.TypeFiller, SourceStartMs: 10500, SourceEndMs: 10800, Confidence: &conf},
+		},
+		Overrides: []Override{
+			{MediaFileID: mediaID, Type: DecisionSilence, Action: ActionKeep, SourceStartMs: 10000, SourceEndMs: 12000},
+		},
+	})
+	if len(decisions) != 1 || decisions[0].Type != DecisionFiller {
+		t.Fatalf("expected only filler remove to remain, got %+v", decisions)
 	}
 }
 

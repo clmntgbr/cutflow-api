@@ -76,12 +76,14 @@ func (r *userOverrideRepository) DeleteMatching(
 	ctx context.Context,
 	mediaFileID uuid.UUID,
 	startMs, endMs int64,
-	action string,
+	action, overrideType string,
 ) error {
-	return DBWithContext(ctx, r.db).
-		Where(
-			"media_file_id = ? AND source_start_ms = ? AND source_end_ms = ? AND action = ?",
-			mediaFileID, startMs, endMs, action,
-		).
-		Delete(&UserOverrideModel{}).Error
+	q := DBWithContext(ctx, r.db).Where(
+		"media_file_id = ? AND source_start_ms = ? AND source_end_ms = ? AND action = ?",
+		mediaFileID, startMs, endMs, action,
+	)
+	if overrideType != "" {
+		q = q.Where("override_type = ?", overrideType)
+	}
+	return q.Delete(&UserOverrideModel{}).Error
 }
